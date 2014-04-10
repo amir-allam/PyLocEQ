@@ -1,19 +1,22 @@
-def create_event_list(db):
+def create_event_list(view):
     """
-    Create and return a list of Event objects.
+    Create and return a list of core_tools.Event objects.
 
     Arguments:
-    db - A (potentially subsetted) View of the Event table from the
-    CSS3.0 database schema.
+    view - A datascope database pointer to a (potentially subsetted) View
+    of the Event table from the CSS3.0 database schema.
 
     Return Values:
     A list of Event objects.
+
+    Behaviour:
+    This method does NOT open or close the database passed in.
     """
     from core_tools import Event
     import time as pytime
     import calendar
     event_list = []
-    for record1 in db.iter_record():
+    for record1 in view.iter_record():
         evid, evname, prefor, auth, commid, lddate = record1.getv('evid',
                                                                  'evname',
                                                                  'prefor',
@@ -26,7 +29,7 @@ def create_event_list(db):
                       auth=auth,
                       commid=commid,
                       lddate=lddate)
-        view2 = db.subset('evid == %d' % evid)
+        view2 = view.subset('evid == %d' % evid)
         view2 = view2.join('origin')
         view2 = view2.separate('origin')
         for record2 in view2.iter_record():
@@ -63,8 +66,8 @@ def create_event_list(db):
                                          'arrival.time',
                                          'iphase', 'arid')\
                                          for record3 in view3.iter_record()]
-            arrivals = [Phase(sta, time, phase, arid=arid)
-                        for sta, time, phase, arid in arrival_data]
+            arrivals = [Phase(name, time, phase, arid=arid)
+                        for name, time, phase, arid in arrival_data]
             event.add_origin(lat,
                              lon,
                              depth,
@@ -96,3 +99,98 @@ def create_event_list(db):
         event_list += [event]
     return event_list
 
+def create_station_list(view):
+    """
+    Create and return a list of core_tools.Station objects.
+
+    Arguments:
+    view - A datascope database pointer to a (potentially subsetted) View
+    of the Site table from the CSS3.0 database schema.
+
+    Return Values:
+    A list of Station objects.
+
+    Behaviour:
+    This method does NOT open or close the database passed in.
+    """
+    from core_tools import Station
+    view = view.sort('sta', unique=True)
+    station_list = []
+    for record in view.iter_record():
+        name, lat, lon, elev = record.getv('sta', 'lat', 'lon', 'elev')
+        station_list += [Station(name, lat, lon, elev)]
+    return station_list
+
+def write_origin_2_db(origin, output, case):
+    """
+    Write an origin in a given output format.
+
+    Arguments:
+    origin - A core_tools.Origin object to be written out.
+    output - A datascope database pointer to an open output database.
+    case - A flag specifying which of the three cases below exists.
+    (See Additional Comments)
+
+    Return Values:
+    0 - Sucess
+    -1 - Failure
+
+    Behaviour:
+    This method does NOT open or close the database passed in.
+
+    Additional Comments:
+    There are three cases that must be handled when writing out to
+    a CSS3.0 schema database.
+    Case 1: Reading from and writing to SAME database.
+    Case 2: Reading from and writing to SEPARATE databases.
+    Case 3: Reading from SCEDC format file and writing to CSS3.0
+    database.
+
+    Currently only case 2 is properly handled. 
+    """
+    origin = map_null_values(origin)
+    if case == 1 or case == 2:
+    #for case 1, evid needs to be properly set before this point
+        if case == 2:
+            origin.evid = output.nextid('evid')
+        origin.orid = output.nextid('orid')
+        tbl_origin = output.schema_tables['origin']
+        tbl_origin.record = tbl_origin.addnull()
+        tbl_origin.putv('lat', origin.lat,
+                        'lon', origin.lon,
+                        'depth', origin.depth,
+                        'time', origin.time,
+                        'orid', origin.orid,
+                        'evid', origin.evid,
+                        'auth', origin.auth,
+                        'jdate', origin.jdate,
+                        'nass', origin.nass,
+                        'ndef', origin.ndef,
+                        'ndp', origin.ndp,
+                        'grn', origin.grn,
+                        'srn', origin.srn,
+                        'etype', origin.etype,
+                        'review', origin.review,
+                        'depdp', origin.depdp,
+                        'dtype', origin.dtype,
+                        'mb', origin.mb,
+                        'mbid', origin.mbid,
+                        'ms', origin.ms,
+                        'msid', origin.msid,
+                        'ml', origin.ml,
+                        'mlid', origin.mlid,
+                        'algorithm', origin.algorithm,
+                        'commid', origin.commid,
+                        'lddate', origin.lddate)
+        if case == 2:
+            tbl_assoc = output.schema_tables['assoc']
+            for arrival in origin.arrivals:
+                if arrival.arid == None:
+                    pass
+    return 0
+
+def map_null_values(obj):
+    """
+    Maps 'None' field values to appropriate CSS3.0 null field values.
+    """
+    print 'IMPLEMENT map_null_values()!!!'
