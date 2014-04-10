@@ -1,0 +1,70 @@
+1                                number of receivers
+0.0000  18.0   18.0              position depth (km),lat(deg),long(deg)
+4                                number of paths to this receiver
+1 1 1 1                          the source of each path
+1 2 3 4                          number of the path in the source path list
+
+
+##### copy the lines below to the top of the file for the simple example
+##### generated with files make_interfaces.f90 and make_vgrids.f90
+##### for a simple test of the frechet derivatives and as an example with
+##### a very short execution time
+
+1                                number of receivers
+0.0000  18.0   18.0              position depth (km),lat(deg),long(deg)
+4                                number of paths to this receiver
+1 1 1 1                          the source of each path
+1 2 3 4                          number of the path in the source path list
+
+
+
+##### copy the lines below to the top of the file for the example  with the
+##### subducting slab model (interfaces and velocities generated with make_cmplayers.f90
+##### and make_cmpvelocities.f90)
+
+8                               number of receivers
+0.000  0.20   0.90              position depth (km),lat(deg),long(deg)
+7                               number of paths to this receiver
+1 1 2 2 3 4 4                   the source of each path
+1 2 1 2 1 1 2                   number of the path in the source path list
+0.000  0.40   0.90              position depth (km),lat(deg),long(deg)
+7                               number of paths to this receiver
+1 1 2 2 3 4 4                   the source of each path
+1 2 1 2 1 1 2                   number of the path in the source path list
+0.000  0.50   0.70              position depth (km),lat(deg),long(deg)
+7                               number of paths to this receiver
+1 1 2 2 3 4 4                   the source of each path
+1 2 1 2 1 1 2                   number of the path in the source path list
+0.000  0.75   0.75              position depth (km),lat(deg),long(deg)
+7                               number of paths to this receiver
+1 1 2 2 3 4 4                   the source of each path
+1 2 1 2 1 1 2                   number of the path in the source path list
+0.000  0.90   0.90              position depth (km),lat(deg),long(deg)
+7                               number of paths to this receiver
+1 1 2 2 3 4 4                   the source of each path
+1 2 1 2 1 1 2                   number of the path in the source path list
+0.000  0.70   0.50              position depth (km),lat(deg),long(deg)
+5                               number of paths to this receiver
+1 1 2 2 3                       the source of each path
+1 2 1 2 1                       number of the path in the source path list
+0.000  0.90   0.40              position depth (km),lat(deg),long(deg)
+5                               number of paths to this receiver
+1 1 2 2 3                       the source of each path
+1 2 1 2 1                       number of the path in the source path list
+0.000  0.90   0.20              position depth (km),lat(deg),long(deg)
+5                               number of paths to this receiver
+1 1 2 2 3                       the source of each path
+1 2 1 2 1                       number of the path in the source path list
+
+
+
+
+##### ak135 model (interfaces and velocities generated with make_aklayers.f90
+##### and make_akvelP.f90)
+
+
+1                                number of receivers
+0.0000  18.0   18.0              position depth (km),lat(deg),long(deg)
+4                                number of paths to this receiver
+1 1 1 1                          the source of each path
+1 2 3 4                          number of the path in the source path list
