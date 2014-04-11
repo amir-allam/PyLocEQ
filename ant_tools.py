@@ -1,7 +1,9 @@
 import sys
 import os
 sys.path.append('%s/data/python' % os.environ['ANTELOPE'])
-from antelope.datascope import DbfindEnd
+from antelope.datascope import DbfindEnd,\
+                               dbTABLE_FIELDS,\
+                               dbTABLE_NAME
 
 def create_event_list(view):
     """
@@ -17,7 +19,7 @@ def create_event_list(view):
     Behaviour:
     This method does NOT open or close the database passed in.
     """
-    from core_tools import Event
+    from temp_core_tools import Event, Phase
     import time as pytime
     import calendar
     event_list = []
@@ -28,8 +30,8 @@ def create_event_list(view):
                                                                  'auth',
                                                                  'commid',
                                                                  'lddate')
-        event = Event(evid,
-                      prefor,
+        event = Event(prefor,
+                      evid=evid,
                       evname=evname,
                       auth=auth,
                       commid=commid,
@@ -148,41 +150,43 @@ def write_origin(origin, output):
     """
     tbl_origin = output.schema_tables['origin']
     origin.orid = output.nextid('orid')
+    print origin.lddate
     origin = map_null_values(tbl_origin, origin)
+    print origin.lddate
     tbl_origin.record = tbl_origin.addnull()
-    tbl_origin.putv('lat', origin.lat,
-                    'lon', origin.lon,
-                    'depth', origin.depth,
-                    'time', origin.time,
-                    'orid', origin.orid,
-                    'evid', origin.evid,
-                    'auth', origin.auth,
-                    'jdate', origin.jdate,
-                    'nass', origin.nass,
-                    'ndef', origin.ndef,
-                    'ndp', origin.ndp,
-                    'grn', origin.grn,
-                    'srn', origin.srn,
-                    'etype', origin.etype,
-                    'review', origin.review,
-                    'depdp', origin.depdp,
-                    'dtype', origin.dtype,
-                    'mb', origin.mb,
-                    'mbid', origin.mbid,
-                    'ms', origin.ms,
-                    'msid', origin.msid,
-                    'ml', origin.ml,
-                    'mlid', origin.mlid,
-                    'algorithm', origin.algorithm,
-                    'commid', origin.commid,
-                    'lddate', origin.lddate)
+    tbl_origin.putv(('lat', origin.lat),
+                    ('lon', origin.lon),
+                    ('depth', origin.depth),
+                    ('time', origin.time),
+                    ('orid', origin.orid),
+                    ('evid', origin.evid),
+                    ('auth', origin.auth),
+                    ('jdate', origin.jdate),
+                    ('nass', origin.nass),
+                    ('ndef', origin.ndef),
+                    ('ndp', origin.ndp),
+                    ('grn', origin.grn),
+                    ('srn', origin.srn),
+                    ('etype', origin.etype),
+                    ('review', origin.review),
+                    ('depdp', origin.depdp),
+                    ('dtype', origin.dtype),
+                    ('mb', origin.mb),
+                    ('mbid', origin.mbid),
+                    ('ms', origin.ms),
+                    ('msid', origin.msid),
+                    ('ml', origin.ml),
+                    ('mlid', origin.mlid),
+                    ('algorithm', origin.algorithm),
+                    ('commid', origin.commid))
+                    #'lddate', origin.lddate)
     tbl_assoc = output.schema_tables['assoc']
     for arrival in origin.arrivals:
         tbl_assoc.record = tbl_assoc.addnull()
-        tbl_assoc.putv('arid', arrival.arid,
-                       'orid', origin.orid,
-                       'sta', arrival.sta,
-                       'phase', arrival.phase)
+        tbl_assoc.putv(('arid', arrival.arid),
+                       ('orid', origin.orid),
+                       ('sta', arrival.sta),
+                       ('phase', arrival.phase))
     return 0
 
 def map_null_values(table, obj):
@@ -190,7 +194,8 @@ def map_null_values(table, obj):
     Maps 'None' field values to appropriate CSS3.0 null field values.
     """
     from antpy import get_null_value
+    print get_null_value('origin', 'lddate')
     for field in table.query(dbTABLE_FIELDS):
         if getattr(obj, field) == None:
-           setattr(obj, get_null_value(table.query(dbTABLE_NAME), field))
+           setattr(obj, field, get_null_value(table.query(dbTABLE_NAME), field))
     return obj

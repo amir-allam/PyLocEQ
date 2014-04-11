@@ -44,15 +44,15 @@ class Station:
     """
     A containter class for station location data.
     """
-    def __init__(self, name, lat, lon, elev):
-        self.name = name
+    def __init__(self, sta, lat, lon, elev):
+        self.sta = sta
         self.lat = lat
         self.lon = lon
         self.elev = elev
 
     def __str__(self):
         ret = 'Station Object\n--------------\n'
-        ret += 'name:\t\t%s' % name
+        ret += 'sta:\t\t%s' % name
         ret += 'lat:\t\t%s' % lat
         ret += 'lon:\t\t%s' % lon
         ret += 'elev:\t\t%s' % elev
@@ -284,7 +284,7 @@ class Origin():
         ret += 'lddate:\t\t%s\n' % self.lddate
         ret += 'arrivals:\n'
         for i in range(len(self.arrivals)):
-            ret += '\t\t%s' % self.arrivals[i]
+            ret += '%s' % self.arrivals[i]
         return ret
 
 class Phase():
@@ -304,6 +304,7 @@ class Phase():
         ret += 'sta:\t\t%s\n' % self.sta
         ret += 'time:\t\t%s\n' % self.time
         ret += 'phase:\t\t%s\n' % self.phase
+        ret += 'arid:\t\t%s\n' % self.arid
         ret += 'qual:\t\t%s\n'  % self.qual
         return ret
 
