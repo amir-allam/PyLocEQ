@@ -4,6 +4,7 @@ sys.path.append('%s/data/python' % os.environ['ANTELOPE'])
 from antelope.datascope import DbfindEnd,\
                                dbTABLE_FIELDS,\
                                dbTABLE_NAME
+from antelope.stock import pfin
 
 def create_event_list(view):
     """
@@ -199,3 +200,25 @@ def map_null_values(table, obj):
         if getattr(obj, field) == None:
            setattr(obj, field, get_null_value(table.query(dbTABLE_NAME), field))
     return obj
+
+def pf_2_cfg(config_file):
+    import ConfigParser
+    if os.path.isfile(config_file):
+        try:
+            os.remove(config_file)
+        except Exception:
+            print 'Could not remove potentially stale configuration file - %s.\n'\
+                    'Please remove and try again.' % config_file
+            sys.exit(-1)
+    config = ConfigParser.RawConfigParser()
+    config.add_section('misc')
+    pf = pfin('pyloceq.pf')
+    for key1 in pf.keys():
+        if isinstance(pf[key1], dict):
+            config.add_section(key1)
+            for key2 in pf[key1]:
+                config.set(key1, key2, pf[key1][key2])
+        else:
+            config.set('misc', key1, pf[key1])
+    with open(config_file, 'w') as config_file:
+        config.write(config_file)
