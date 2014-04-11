@@ -182,7 +182,7 @@ def write_origin(origin, output):
         tbl_assoc.putv('arid', arrival.arid,
                        'orid', origin.orid,
                        'sta', arrival.sta,
-                       'phase', arrival.phase,
+                       'phase', arrival.phase)
     return 0
 
 def map_null_values(table, obj):
