@@ -32,3 +32,5 @@ location_parameters &Arr{
     dstep2      5
     buff2       7
 }
+
+tt_map_dir    /Users/mcwhite/staging/tt_maps/
