@@ -8,11 +8,12 @@ def create_event_list(infile):
     Return Values:
     A list of Event objects.
     """
-    from core_tools import Event
+    from temp_core_tools import Event, Phase
     import time as pytime
     import calendar
     infile = open(infile, 'r')
     event = None
+    event_list = []
     for line in infile:
         line = line.strip().split()
         #In SCEDC format, event lines begin with '#'
@@ -41,7 +42,7 @@ def create_event_list(infile):
                           orid,
                           auth='SCEDC',
                           lddate=pytime.time())
-            event.add_origin(lat, lon, depth, time, orid, 'SCEDC', evid=evid)
+            event.add_origin(lat, lon, depth, time, 'SCEDC', orid=orid, evid=evid)
             event.set_preferred_origin(orid)
         else:
             sta = line[0]
