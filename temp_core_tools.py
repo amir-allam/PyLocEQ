@@ -1,44 +1,62 @@
-class StationList(list):
-    """
-    A container class for a list of Station objects.
+#class StationList(list):
+#    """
+#    A container class for a list of Station objects.
+#
+#    This class replaces the deprecated Stalist class.
+#    """
+#    def __init__(self, sta, lat, lon, elev):
+#        self.append(Station(sta, lat, lon, elev)
+#
+#    def __str__(self):
+#        ret = 'StationList Object\n------------------\n'
+#        for sta in self:
+#             ret += '%s\n' % sta
+##            ret += 'sta:\t\t%s\n' % sta.name
+##            ret += 'lat:\t\t%s\n' % sta.lat
+##            ret += 'lon:\t\t%s\n' % sta.lon
+##            ret += 'elev:\t\t%s\n' % sta.elev
+#        return ret
+#
+#    def _init_db(self, db):
+#        """
+#        Initialize station list using a CSS3.0 database as input.
+#        """
+#        with closing(dbopen(db, 'r')) as db:
+#            tbl_site = db.schema_tables['site']
+#            tbl_site = tbl_site.sort('sta', unique=True)
+#            for record in tbl_site.iter_record():
+#                sta, lat, lon, elev = record.getv('sta', 'lat', 'lon', 'elev')
+#                self.append(Station(sta, lat, lon, elev))
+#
+#    def _init_scedc(self, infile):
+#        """
+#        Initialize station list using SCEDC format flat file as input.
+#        """
+#        infile = open(infile, 'r')
+#        for line in infile:
+#            line = line.strip().split() #stripping may be uneccessary
+#            self.append(Station(line[0],
+#                                 float(line[1]),
+#                                 float(line[2]),
+#                                 float(line[3])))
 
-    This class replaces the deprecated Stalist class.
+class Station:
     """
-    def __init__(self, inp, is_db=True):
-        if is_db: self._init_db(inp)
-        else: self._init_scedc(inp)
+    A containter class for station location data.
+    """
+    def __init__(self, sta, lat, lon, elev):
+        self.sta = sta
+        self.lat = lat
+        self.lon = lon
+        self.elev = elev
 
     def __str__(self):
-        ret = 'StationList Object\n------------------\n'
-        for sta in self:
-            ret += 'sta:\t\t%s\n' % sta.name
-            ret += 'lat:\t\t%s\n' % sta.lat
-            ret += 'lon:\t\t%s\n' % sta.lon
-            ret += 'elev:\t\t%s\n' % sta.elev
+        ret = 'Station Object\n--------------\n'
+        ret += 'sta:\t\t%s' % name
+        ret += 'lat:\t\t%s' % lat
+        ret += 'lon:\t\t%s' % lon
+        ret += 'elev:\t\t%s' % elev
         return ret
-
-    def _init_db(self, db):
-        """
-        Initialize station list using a CSS3.0 database as input.
-        """
-        with closing(dbopen(db, 'r')) as db:
-            tbl_site = db.schema_tables['site']
-            tbl_site = tbl_site.sort('sta', unique=True)
-            for record in tbl_site.iter_record():
-                sta, lat, lon, elev = record.getv('sta', 'lat', 'lon', 'elev')
-                self.append(Station(sta, lat, lon, elev))
-
-    def _init_scedc(self, infile):
-        """
-        Initialize station list using SCEDC format flat file as input.
-        """
-        infile = open(infile, 'r')
-        for line in infile:
-            line = line.strip().split() #stripping may be uneccessary
-            self.append(Station(line[0],
-                                 float(line[1]),
-                                 float(line[2]),
-                                 float(line[3])))
 
 class Event():
     """
@@ -172,55 +190,6 @@ class Event():
             pass
         else:
             raise Exception('Output format %s not recognized' % fmt)
-    def _write_css(self, db):
-        """
-        Write newly authored data to a CSS3.0 database.
-
-        Arguments:
-        db - Output database.
-        """
-        #There are three cases that must be handled when writing out to
-        #a CSS3.0 schema database.
-        #Case 1: Reading from and writing to SAME database.
-        #Case 2: Reading from and writing to SEPARATE databases.
-        #Case 3: Reading from SCEDC format file and writing to CSS3.0
-        #database.
-        for origin in self.origins:
-            if origin.auth == 'eqloc3d':
-                tbl_origin = out.schema_tables['origin']
-                tbl_origin.record = tbl_origin.addnull()
-                tbl_origin.putv('lat', origin.lat,
-                                'lon', origin.lon,
-                                'depth', origin.depth,
-                                'time', origin.time,
-                                'orid', origin.orid,
-                                'evid', origin.evid,
-                                'auth', origin.auth,
-                                'jdate', origin.jdate,
-                                'nass', origin.nass,
-                                'ndef', origin.ndef,
-                                'ndp', origin.ndp,
-                                'grn', origin.grn,
-                                'srn', origin.srn,
-                                'etype', origin.etype,
-                                'review', origin.review,
-                                'depdp', origin.depdp,
-                                'dtype', origin.dtype,
-                                'mb', origin.mb,
-                                'mbid', origin.mbid,
-                                'ms', origin.ms,
-                                'msid', origin.msid,
-                                'ml', origin.ml,
-                                'mlid', origin.mlid,
-                                'algorithm', origin.algorithm,
-                                'commid', origin.commid,
-                                'lddate', origin.lddate)
-                tbl_assoc = out.schema_tables['assoc']
-                for arrival in origin.arrivals:
-                    if arrival.arid == None:
-                        pass
-                        #arrival is from SCEDC source add row to arrival table
-        return 0
 
 class Origin():
     """
@@ -315,17 +284,18 @@ class Origin():
         ret += 'lddate:\t\t%s\n' % self.lddate
         ret += 'arrivals:\n'
         for i in range(len(self.arrivals)):
-            ret += '\t\t%s' % self.arrivals[i]
+            ret += '%s' % self.arrivals[i]
         return ret
 
 class Phase():
     """
     A container class for phase data.
     """
-    def __init__(self, sta, time, phase, qual=None, arid=None):
+    def __init__(self, sta, time, phase, chan=None, qual=None, arid=None):
         self.sta = sta
         self.time = time
         self.phase = phase
+        self.chan = chan
         self.qual = qual
         self.arid = arid
 
@@ -334,6 +304,7 @@ class Phase():
         ret += 'sta:\t\t%s\n' % self.sta
         ret += 'time:\t\t%s\n' % self.time
         ret += 'phase:\t\t%s\n' % self.phase
+        ret += 'arid:\t\t%s\n' % self.arid
         ret += 'qual:\t\t%s\n'  % self.qual
         return ret
 
