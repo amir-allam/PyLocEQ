@@ -478,7 +478,7 @@ class Locator:
         bA = c_[bdt_dx, bdt_dy, bdt_dz]
         bc, resid, rank, sigma = linalg.lstsq(bA, r)
         #Compute updated travel times
-        tt_updated=A*c+tt000 #Check if c is row-wise
+        tt_updated=tt000+(A*c).sum(axis=1) #c has independent changes for x,y,z, so sum them
         return c, resid,tt_updated
 
     def fix_boundary_search(self, qx, nx):
