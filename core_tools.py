@@ -445,38 +445,30 @@ class Locator:
         from scipy import linalg
         import matplotlib.pyplot as plt
 
+        #Cut off derivative calculations at model boundaries
+        endx=ix+1; endy=iy+1; endz=iz+1
+        endx=ix if endx==li.nx
+        endy=iy if endy==li.ny
+        endz=iz if endz==li.nz
         #Get traveltime vectors for the closest point and its neighbors
         ind = li.get_1D(ix,iy,iz)
         tt000 = self.read_tt_vector(arrsta, ind)
-        ind = li.get_1D(ix + 1, iy, iz)
+        ind = li.get_1D(endx, iy, iz)
         tt100 = self.read_tt_vector(arrsta, ind)
-        ind = li.get_1D(ix, iy + 1, iz)
+        ind = li.get_1D(ix, endy, iz)
         tt010 = self.read_tt_vector(arrsta, ind)
-        ind = li.get_1D(ix, iy, iz + 1)
+        ind = li.get_1D(ix, iy, endz)
         tt001 = self.read_tt_vector(arrsta, ind)
-        #backwards
-        ind = li.get_1D(ix - 1, iy, iz)
-        btt100 = self.read_tt_vector(arrsta, ind)
-        ind = li.get_1D(ix, iy - 1, iz)
-        btt010 = self.read_tt_vector(arrsta, ind)
-        ind = li.get_1D(ix, iy ,iz - 1)
-        btt001 = self.read_tt_vector(arrsta, ind)
 
         #Calculate forward derivatives
         dt_dx = tt100 - tt000
         dt_dy = tt010 - tt000
         dt_dz = tt001 - tt000
-        #backwards
-        bdt_dx = tt000 - btt100
-        bdt_dy = tt000 - btt010
-        bdt_dz = tt000 - btt001
         #Build A matrix and r in r=Ax  (x is the spatial vector here [x,y,z]
         A = c_[dt_dx, dt_dy, dt_dz]
         r = arrvec - tt000
         c, resid, rank, sigma = linalg.lstsq(A, r)
-        #backwards
-        bA = c_[bdt_dx, bdt_dy, bdt_dz]
-        bc, resid, rank, sigma = linalg.lstsq(bA, r)
+
         #Compute updated travel times
         tt_updated=tt000+(A*c).sum(axis=1) #c has independent changes for x,y,z, so sum them
         return c, resid,tt_updated
