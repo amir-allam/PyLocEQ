@@ -297,11 +297,13 @@ class Locator:
         absvec = []
         arrvec = []
         arrsta = []        #a list of station names
+        arrpha = []        #List of phases
         for arrival in ev.arrivals:
             if arrival.phase is 'P':
                 arrvec.append(arrival.time - ev.time)
                 absvec.append(arrival.time)
                 arrsta.append(arrival.sta)
+                arrpha.append(arrival.phase)
             if not os.path.isfile(arrival.sta + 'traveltime'):
                 continue
         if len(arrvec)<6: #About this many phases are needed to get a decent result
@@ -314,11 +316,10 @@ class Locator:
         #dstep should go in parameter file.
         dstep = int(loc_params['dstep2'])
         dx, dy, dz = nlon / dstep, nlat / dstep, nz / dstep
-        dx, dy, dz = 1,1,1 #Remove this later
+        #dx, dy, dz = 1,1,1 #Remove this later
         qx, qy, qz = range(1, nlon, dx), range(1, nlat, dy), range(1, nz, dz);
-        minx, miny, minz, orgmin = self.grid_search_traveltimes_origin(arrsta, qx, qy,
-                                                                    qz, absvec, li)
-        #minx, miny, minz, orgmin = exp_grid_search(arrsta,qx,qy,qz, absvec, li,ev.time)
+        #minx, miny, minz, orgmin = self.grid_search_traveltimes_origin(arrsta, qx, qy,qz, absvec, li)
+        minx, miny, minz, origin_mean, origin_std= self.exp_grid_search(arrsta,qx,qy,qz, absvec, li)
         #Finer search
     #    minx, miny, minz = grid_search_traveltimes_rms(arrsta, qx, qy, qz,
     #                                                            arrvec,li)
@@ -329,28 +330,34 @@ class Locator:
         qx = self.fix_boundary_search(qx, li.nx)
         qy = self.fix_boundary_search(qy, li.ny)
         qz = self.fix_boundary_search(qz, li.nz)
-        #minx, miny, minz, orgmin = grid_search_traveltimes_origin(arrsta, qx, qy,
-        #                                                            qz, absvec, li)
-        #minx, miny, minz, orgmin = exp_grid_search(arrsta,qx,qy,qz, absvec, li,ev.time)
-    #    minx, miny, minz = grid_search_traveltimes_rms(arrsta, qx, qy, qz,
-    #                                                            arrvec,li)
-        orgmin = 0
+        #minx, miny, minz, orgmin = self.grid_search_traveltimes_origin(arrsta, qx, qy,qz, absvec, li)
+        minx, miny, minz, origin_mean, origin_std= self.exp_grid_search(arrsta,qx,qy,qz, absvec, li)
+    #    minx, miny, minz = grid_search_traveltimes_rms(arrsta, qx, qy, qz,arrvec,li)
+        #orgmin = 0
 
         #Find the best subgrid location
-        c,resid = self.get_subgrid_loc(minx,miny,minz,arrvec,arrsta,li)
+        c,resid,tt_updated = self.get_subgrid_loc(minx,miny,minz,arrvec,arrsta,li)
         delta_x = qlon[1] - qlon[0]
         delta_y = qlat[1] - qlat[0]
         delta_z = qdep[1] - qdep[0]
         loc_change = c*[delta_x,delta_y,delta_z] #Subgrid location change in lon/lat/depth
 
+        #Add calculated travel times to Origin
+        ic=0 #Just a counter
+        for arrival in Origin.arrivals: #Loop over all input phases
+            if (arrsta[ic] is arrival.sta) and (arrpha[ic] is arrival.phase):
+                arrival.tt_calc=tt_updated[ic] #Only update the ones used in the relocation
+            ic+=1
+
         #Find the best-fit source location in geographic coordinates
         newloc = [newlon,newlat,newz] = [ qlon[minx],qlat[miny],qdep[minz] ] #+loc_change
+        best_otime=origin_mean.flatten()[origin_std.argmin()]
         elapsed_time = time.time() - start_time
-        print ev.orid,len(arrvec),newlon,newlat,earth_rad - newz,ev.lon,ev.lat,ev.depth,ev.time - orgmin,elapsed_time,resid
+        print ev.orid,len(arrvec),newlon,newlat,earth_rad - newz,ev.lon,ev.lat,ev.depth,ev.time -best_otime,elapsed_time,resid
         return Origin(newlat,
                       newlon,
                       earth_rad - newz,
-                      597649530.000,
+                      best_otime,
                       'PyLocEQ',
                       arrivals=ev.arrivals,
                       evid=ev.evid)
@@ -369,7 +376,7 @@ class Locator:
         #origin_mean = empty([ len(qy),len(qx),len(qz)] )
         search_inds = Linear_index(len(qx),len(qy),len(qz))
         for ix in qx: #range(len(qx)):  #Loop over the three vectors, searching every point
-            print 'On ix: ', ix,'/',len(qx),'\n'
+            #print 'On ix: ', ix,'/',len(qx),'\n'
             for iy in qy: #range(len(qy)):
                 for iz in qz: #range(len(qz)):
                     calctt = array([]); #initialize the calculated tt vector
@@ -425,8 +432,9 @@ class Locator:
         #   stanames is a list of station names only
         from numpy import array
         ttvec = array([])
+        ttdir=self.misc['tt_map_dir']
         for sta in stanames:
-            fid = open('%sbin.%s.traveltime' % (self.misc['tt_map_dir'], sta))
+            fid = open(ttdir+'bin.'+sta+'.traveltime')
             ttvec = append(ttvec, read_binary_float(fid,ind) )
             fid.close()
         return ttvec
@@ -436,7 +444,7 @@ class Locator:
         import numpy as np
         from scipy import linalg
         import matplotlib.pyplot as plt
-    
+
         #Get traveltime vectors for the closest point and its neighbors
         ind = li.get_1D(ix,iy,iz)
         tt000 = self.read_tt_vector(arrsta, ind)
@@ -453,7 +461,7 @@ class Locator:
         btt010 = self.read_tt_vector(arrsta, ind)
         ind = li.get_1D(ix, iy ,iz - 1)
         btt001 = self.read_tt_vector(arrsta, ind)
-    
+
         #Calculate forward derivatives
         dt_dx = tt100 - tt000
         dt_dy = tt010 - tt000
@@ -469,7 +477,9 @@ class Locator:
         #backwards
         bA = c_[bdt_dx, bdt_dy, bdt_dz]
         bc, resid, rank, sigma = linalg.lstsq(bA, r)
-        return c, resid
+        #Compute updated travel times
+        tt_updated=A*c+tt000 #Check if c is row-wise
+        return c, resid,tt_updated
 
     def fix_boundary_search(self, qx, nx):
     #When performing a grid search on a subgrid, make sure you don't go off the edges
@@ -548,3 +558,274 @@ class Linear_index():
         return self.i3D[ix,iy,iz]
     def get_3D(self,iv):
         return self.i1D[iv]
+
+################################################
+class Station:
+    """
+    A containter class for station location data.
+    """
+    def __init__(self, sta, lat, lon, elev):
+        self.sta = sta
+        self.lat = lat
+        self.lon = lon
+        self.elev = elev
+
+    def __str__(self):
+        ret = 'Station Object\n--------------\n'
+        ret += 'sta:\t\t%s' % name
+        ret += 'lat:\t\t%s' % lat
+        ret += 'lon:\t\t%s' % lon
+        ret += 'elev:\t\t%s' % elev
+        return ret
+
+class Event():
+    """
+    A container class for earthquake event metadata.
+    """
+    #def __init__(self, time, lat, lon, depth, mag, magtype=None, evid=None):
+    def __init__(self,
+                 prefor,
+                 evid=None,
+                 evname=None,
+                 auth=None,
+                 commid=None,
+                 lddate=None,
+                 origins=None):
+        """
+        Initialize Event object using one of two possible inputs.
+        """
+        import time as pytime
+        self.evid = evid
+        self.evname = evname
+        self.prefor = prefor
+        self.auth = auth
+        self.commid = commid
+        self.lddate = lddate
+        self.preferred_origin = None
+        if origins == None: self.origins = []
+        else: self.origins = origins
+
+    def __str__(self):
+        ret = 'Event Object\n------------\n'
+        ret += 'evid:\t\t%s\n' % self.evid
+        ret += 'evname:\t\t%s\n' % self.evname
+        ret += 'prefor:\t\t%s\n' % self.prefor
+        ret += 'auth:\t\t%s\n' % self.auth
+        ret += 'commid:\t\t%s\n' % self.commid
+        ret += 'lddate:\t\t%s\n' % self.lddate
+        ret += 'origins:\n'
+        if len(self.origins) == 0:
+            ret += '\t\tNone\n'
+        else:
+            for i in range(len(self.origins)):
+                for line in  ('%s' % self.origins[i]).split('\n'):
+                    ret += '\t\t%s\n' % line
+        return ret
+
+    def set_preferred_origin(self, prefor):
+        """
+        Set self.preferred_origin to equal origin with orid == prefor.
+        """
+        for i in range(len(self.origins)):
+            if self.origins[i].orid == prefor:
+                self.preferred_origin = self.origins[i]
+                return 0
+
+    def add_origin(self,
+                   lat,
+                   lon,
+                   depth,
+                   time,
+                   auth,
+                   arrivals=[],
+                   orid=None,
+                   evid=None,
+                   jdate=None,
+                   nass=None,
+                   ndef=None,
+                   ndp=None,
+                   grn=None,
+                   srn=None,
+                   etype=None,
+                   review=None,
+                   depdp=None,
+                   dtype=None,
+                   mb=None,
+                   mbid=None,
+                   ms=None,
+                   msid=None,
+                   ml=None,
+                   mlid=None,
+                   algorithm=None,
+                   commid=None,
+                   lddate=None):
+        """
+        Add an Origin object to the list of origins associated with this event.
+        """
+        self.origins += [Origin(lat,
+                                lon,
+                                depth,
+                                time,
+                                auth,
+                                orid=orid,
+                                evid=evid,
+                                arrivals=arrivals,
+                                jdate=jdate,
+                                nass=nass,
+                                ndef=ndef,
+                                ndp=ndp,
+                                grn=grn,
+                                srn=srn,
+                                etype=etype,
+                                review=review,
+                                depdp=depdp,
+                                dtype=dtype,
+                                mb=mb,
+                                mbid=mbid,
+                                ms=ms,
+                                msid=msid,
+                                ml=ml,
+                                mlid=mlid,
+                                algorithm=algorithm,
+                                commid=commid,
+                                lddate=lddate)]
+    def write(self, out, fmt):
+        """
+        Write out newly authored data pertaining to event.
+
+        Arguments:
+        out - A datascope db pointer to an open CSS3.0 database for output.
+        Alternatively the path to an output SCEDC format flat file.
+
+        fmt - The format of the 'out' argument; 'CSS3.0' or 'SCEDC'.
+
+        Return Values:
+        0 - Success
+        -1 - Failure
+        """
+        if fmt == 'CSS3.0':
+            return self._write_CSS()
+        elif fmt == 'SCEDC':
+            #Do it the SCEDC way
+            pass
+        else:
+            raise Exception('Output format %s not recognized' % fmt)
+
+class Origin():
+    """
+    A container class for origin data.
+    """
+    def __init__(self,
+                 lat,
+                 lon,
+                 depth,
+                 time,
+                 auth,
+                 arrivals=[],
+                 orid=None,
+                 evid=None,
+                 jdate=None,
+                 nass=None,
+                 ndef=None,
+                 ndp=None,
+                 grn=None,
+                 srn=None,
+                 etype=None,
+                 review=None,
+                 depdp=None,
+                 dtype=None,
+                 mb=None,
+                 mbid=None,
+                 ms=None,
+                 msid=None,
+                 ml=None,
+                 mlid=None,
+                 algorithm=None,
+                 commid=None,
+                 lddate=None):
+        self.lat = lat
+        self.lon = lon
+        self.depth = depth
+        self.time = time
+        self.orid = orid
+        self.evid = evid
+        self.auth = auth
+        self.arrivals = arrivals
+        self.jdate = jdate
+        self.nass = nass
+        self.ndef = ndef
+        self.ndp = ndp
+        self.grn = grn
+        self.srn = srn
+        self.etype = etype
+        self.review = review
+        self.depdp = depdp
+        self.dtype = dtype
+        self.mb = mb
+        self.mbid = mbid
+        self.ms = ms
+        self.msid = msid
+        self.ml = ml
+        self.mlid = mlid
+        self.algorithm = algorithm
+        self.commid = commid
+        self.lddate = lddate
+
+    def __str__(self):
+        """
+        Return string representation of Origin object.
+        """
+        ret = 'Origin Object\n-------------\n'
+        ret += 'lat:\t\t%s\n' % self.lat
+        ret += 'lon:\t\t%s\n' % self.lon
+        ret += 'depth:\t\t%s\n' % self.depth
+        ret += 'time:\t\t%s\n' % self.time
+        ret += 'orid:\t\t%s\n' % self.orid
+        ret += 'evid:\t\t%s\n' % self.evid
+        ret += 'auth:\t\t%s\n' % self.auth
+        ret += 'jdate:\t\t%s\n' % self.jdate
+        ret += 'nass:\t\t%s\n' % self.nass
+        ret += 'ndef:\t\t%s\n' % self.ndef
+        ret += 'ndp:\t\t%s\n' % self.ndp
+        ret += 'grn:\t\t%s\n' % self.grn
+        ret += 'srn:\t\t%s\n' % self.srn
+        ret += 'etype:\t\t%s\n' % self.etype
+        ret += 'review:\t\t%s\n' % self.review
+        ret += 'depdp:\t\t%s\n' % self.depdp
+        ret += 'dtype:\t\t%s\n' % self.dtype
+        ret += 'mb:\t\t%s\n' % self.mb
+        ret += 'mbid:\t\t%s\n' % self.mbid
+        ret += 'ms:\t\t%s\n' % self.ms
+        ret += 'msid:\t\t%s\n' % self.msid
+        ret += 'ml:\t\t%s\n' % self.ml
+        ret += 'mlid:\t\t%s\n' % self.mlid
+        ret += 'algorithm:\t\t%s\n' % self.algorithm
+        ret += 'commid:\t\t%s\n' % self.commid
+        ret += 'lddate:\t\t%s\n' % self.lddate
+        ret += 'arrivals:\n'
+        for i in range(len(self.arrivals)):
+            ret += '%s' % self.arrivals[i]
+        return ret
+
+class Phase():
+    """
+    A container class for phase data.
+    """
+    def __init__(self, sta, time, phase, chan=None, qual=None, arid=None):
+        self.sta = sta
+        self.time = time
+        self.phase = phase
+        self.chan = chan
+        self.qual = qual
+        self.arid = arid
+        self.tt_calc=None #Calculated travel time
+
+    def __str__(self):
+        ret = 'Arrival Object\n--------------\n'
+        ret += 'sta:\t\t%s\n' % self.sta
+        ret += 'time:\t\t%s\n' % self.time
+        ret += 'phase:\t\t%s\n' % self.phase
+        ret += 'arid:\t\t%s\n' % self.arid
+        ret += 'qual:\t\t%s\n'  % self.qual
+        return ret
+
