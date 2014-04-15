@@ -181,6 +181,9 @@ def write_origin(origin, output):
                     ('algorithm', origin.algorithm),
                     ('commid', origin.commid))
                     #'lddate', origin.lddate)
+    tbl_event = output.schema_tables['event']
+    tbl_event.record = tbl_event.find('evid == %d' % origin.evid)
+    tbl_event.putv(('prefor', origin.orid))
     tbl_assoc = output.schema_tables['assoc']
     for arrival in origin.arrivals:
         tbl_assoc.record = tbl_assoc.addnull()
