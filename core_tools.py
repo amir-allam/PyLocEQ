@@ -344,7 +344,7 @@ class Locator:
 
         #Add calculated travel times to Origin
         ic=0 #Just a counter
-        for arrival in Origin.arrivals: #Loop over all input phases
+        for arrival in ev.arrivals: #Loop over all input phases
             if (arrsta[ic] is arrival.sta) and (arrpha[ic] is arrival.phase):
                 arrival.tt_calc=tt_updated[ic] #Only update the ones used in the relocation
             ic+=1
