@@ -447,9 +447,9 @@ class Locator:
 
         #Cut off derivative calculations at model boundaries
         endx=ix+1; endy=iy+1; endz=iz+1
-        endx=ix if endx==li.nx
-        endy=iy if endy==li.ny
-        endz=iz if endz==li.nz
+        if endx==li.nx: endx=ix 
+        if endy==li.ny: endy=iy 
+        if endz==li.nz: endz=iz 
         #Get traveltime vectors for the closest point and its neighbors
         ind = li.get_1D(ix,iy,iz)
         tt000 = self.read_tt_vector(arrsta, ind)
