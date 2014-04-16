@@ -14,6 +14,24 @@ def num(s):
     except ValueError:
         return float(s)
 
+def parse_cfg(config_file):
+    """
+    Parse (.cfg) configuration file and return dictionary of contents.
+
+    Arguments:
+    config_file - path to configuration file.
+    """
+    import ConfigParser
+    config = ConfigParser.RawConfigParser()
+    config.read(config_file)
+    return_dict = {}
+    for section in config.sections():
+        section_dict = {}
+        for option in config.options(section):
+            section_dict[option] = config.get(section, option)
+        return_dict[section] = section_dict
+    return return_dict
+
 def load_faults():
 #Load the california fault map
     fnam = 'cal_faults.dat'
@@ -258,15 +276,16 @@ def _grid_search_traveltimes_origin(arrsta,qx,qy,qz,arrvec,li):
 
 
 class Locator:
-    def __init__(self, config_file):
-        import ConfigParser
-        config = ConfigParser.RawConfigParser()
-        config.read(config_file)
-        for section in config.sections():
-            tmp_dict = {}
-            for option in config.options(section):
-                tmp_dict[option] = config.get(section, option)
-            setattr(self, section, tmp_dict)
+    def __init__(self, cfg_dict):
+        """
+        Initialize locator object with a dictionary of paramaters
+        parsed from .cfg file by core_tools.parse_cfg().
+
+        Arguments:
+        cfg_dict - <dict> returned by core_tools.parse_cfg()
+        """
+        for key in cfg_dict:
+            setattr(self, key, cfg_dict[key])
 
     def locate_eq(self, ev):
         #Locate an earthquake based on the arrivals in ev, traveltime files which are already saved
