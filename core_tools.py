@@ -343,11 +343,16 @@ class Locator:
         loc_change = c*[delta_x,delta_y,delta_z] #Subgrid location change in lon/lat/depth
 
         #Add calculated travel times to Origin
-        ic=0 #Just a counter
-        for arrival in ev.arrivals: #Loop over all input phases
-            if (arrsta[ic] is arrival.sta) and (arrpha[ic] is arrival.phase):
-                arrival.tt_calc=tt_updated[ic] #Only update the ones used in the relocation
-            ic+=1
+#        ic=0 #Just a counter
+#        for arrival in ev.arrivals: #Loop over all input phases
+#            if (arrsta[ic] is arrival.sta) and (arrpha[ic] is arrival.phase):
+#                arrival.tt_calc=tt_updated[ic] #Only update the ones used in the relocation
+#            ic+=1
+        for ic in range(len(arrpha)):
+            for arrival in ev.arrivals:
+                if (arrsta[ic] == arrival.sta) and (arrpha[ic] == arrival.phase):
+                    arrival.tt_calc = tt_updated[ic]
+                    break
 
         #Find the best-fit source location in geographic coordinates
         newloc = [newlon,newlat,newz] = [ qlon[minx],qlat[miny],qdep[minz] ] #+loc_change
@@ -810,7 +815,7 @@ class Phase():
         self.chan = chan
         self.qual = qual
         self.arid = arid
-        self.tt_calc=None #Calculated travel time
+        self.tt_calc = None #Calculated travel time
 
     def __str__(self):
         ret = 'Arrival Object\n--------------\n'
@@ -819,5 +824,6 @@ class Phase():
         ret += 'phase:\t\t%s\n' % self.phase
         ret += 'arid:\t\t%s\n' % self.arid
         ret += 'qual:\t\t%s\n'  % self.qual
+        ret += 'tt_calc:\t\t%s\n' % self.tt_calc
         return ret
 
