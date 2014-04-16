@@ -5,6 +5,7 @@ from antelope.datascope import DbfindEnd,\
                                dbTABLE_FIELDS,\
                                dbTABLE_NAME
 from antelope.stock import pfin
+import antpy
 
 def create_event_list(view):
     """
@@ -149,11 +150,10 @@ def write_origin(origin, output):
     same as the input databse. Ie. NO arrival rows are created, they are
     assumed to already exist.
     """
+    from time import time
     tbl_origin = output.schema_tables['origin']
     origin.orid = output.nextid('orid')
-    print origin.lddate
     origin = map_null_values(tbl_origin, origin)
-    print origin.lddate
     tbl_origin.record = tbl_origin.addnull()
     tbl_origin.putv(('lat', origin.lat),
                     ('lon', origin.lon),
@@ -185,12 +185,36 @@ def write_origin(origin, output):
     tbl_event.record = tbl_event.find('evid == %d' % origin.evid)
     tbl_event.putv(('prefor', origin.orid))
     tbl_assoc = output.schema_tables['assoc']
+    tbl_predarr = output.schema_tables['predarr']
+    tbl_site = output.schema_tables['site']
     for arrival in origin.arrivals:
         tbl_assoc.record = tbl_assoc.addnull()
         tbl_assoc.putv(('arid', arrival.arid),
                        ('orid', origin.orid),
                        ('sta', arrival.sta),
                        ('phase', arrival.phase))
+        #view = tbl_site.subset('sta =~ /%s/ && ondate < _%f_ && offdate > _%f_'
+        #    % (arrival.sta, time(), time()))
+        view = tbl_site.subset('sta =~ /%s/ && ondate < _%f_ && (offdate == -1 || offdate > _%f_)' % (arrival.sta, time(), time()))
+        print view.record_count
+        view.record = 0
+        stalat, stalon = view.getv('lat', 'lon')
+        tbl_predarr.record = tbl_predarr.addnull()
+        tbl_predarr.putv(('arid', arrival.arid),
+                         ('orid', origin.orid),
+                         ('time', origin.time + arrival.tt_calc),
+                         ('slow', antpy.distance(stalat, stalon,
+                                                 origin.lat, origin.lon)
+                                                 / arrival.tt_calc),
+                         ('seaz', antpy.azimuth(stalat,
+                                                stalon,
+                                                origin.lat,
+                                                origin.lon)),
+                         ('esaz', antpy.azimuth(origin.lat,
+                                                origin.lon,
+                                                stalat,
+                                                stalon)))
+
     return 0
 
 def map_null_values(table, obj):
@@ -204,8 +228,10 @@ def map_null_values(table, obj):
            setattr(obj, field, get_null_value(table.query(dbTABLE_NAME), field))
     return obj
 
-def pf_2_cfg(config_file):
+def pf_2_cfg(pf, config_file):
     import ConfigParser
+    config_file = '%s.cfg' % config_file
+    pf = '%s.pf' % pf
     if os.path.isfile(config_file):
         try:
             os.remove(config_file)
@@ -215,7 +241,7 @@ def pf_2_cfg(config_file):
             sys.exit(-1)
     config = ConfigParser.RawConfigParser()
     config.add_section('misc')
-    pf = pfin('pyloceq.pf')
+    pf = pfin('%s' % pf)
     for key1 in pf.keys():
         if isinstance(pf[key1], dict):
             config.add_section(key1)
