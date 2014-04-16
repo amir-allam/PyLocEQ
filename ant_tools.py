@@ -188,6 +188,10 @@ def write_origin(origin, output):
     tbl_predarr = output.schema_tables['predarr']
     tbl_site = output.schema_tables['site']
     for arrival in origin.arrivals:
+#THIS IS A HACK!
+#predicted arrival time should be calculated for EVERY arrival
+        if arrival.tt_calc == None:
+            continue
         tbl_assoc.record = tbl_assoc.addnull()
         tbl_assoc.putv(('arid', arrival.arid),
                        ('orid', origin.orid),
