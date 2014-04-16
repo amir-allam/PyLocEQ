@@ -219,7 +219,6 @@ def map_null_values(table, obj):
     Maps 'None' field values to appropriate CSS3.0 null field values.
     """
     from antpy import get_null_value
-    print get_null_value('origin', 'lddate')
     for field in table.query(dbTABLE_FIELDS):
         if getattr(obj, field) == None:
            setattr(obj, field, get_null_value(table.query(dbTABLE_NAME), field))
