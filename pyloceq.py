@@ -15,13 +15,16 @@ def _main():
             view = tbl_event.join('origin')
             view = view.subset(args.subset)
             tbl_event = view.separate('event')
-        event_list = ant_tools.create_event_list(tbl_event)
-        for event in event_list:
-            origin = event.preferred_origin
-            origin = locator.locate_eq(origin)
-            if origin == None:
-                continue
-            ant_tools.write_origin(origin, db)
+        for record in tbl_event.iter_record():
+            evid = record.getv('evid')[0]
+            view = tbl_event.subset('evid == %d' % evid)
+            event_list = ant_tools.create_event_list(view)
+            for event in event_list:
+                origin = event.preferred_origin
+                origin = locator.locate_eq(origin)
+                if origin == None:
+                    continue
+                ant_tools.write_origin(origin, db)
     return 0
 
 def _parse_command_line():
