@@ -2,12 +2,13 @@ import sys
 
 def _main():
     import ant_tools
-    from core_tools import Locator
+    from core_tools import Locator, parse_cfg
     from antelope.datascope import closing, dbopen
     args = _parse_command_line()
     if args.pf: ant_tools.pf_2_cfg(args.pf, 'pyloceq')
     else: ant_tools.pf_2_cfg('pyloceq', 'pyloceq')
-    locator = Locator('pyloceq.cfg')
+    cfg_dict = parse_cfg('pyloceq.cfg')
+    locator = Locator(cfg_dict)
     with closing(dbopen(args.db, 'r+')) as db:
         tbl_event = db.schema_tables['event']
         if args.subset:
