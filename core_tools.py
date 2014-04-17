@@ -47,7 +47,19 @@ def load_faults():
             faultlon.append(num(tmp[0]))
             faultlat.append(num(tmp[1]))
     print 'Faults loaded...'
-    return faultlon,faultlat
+    return faultlon, faultlat
+
+def read_tt_vector(stanames, ind, ttdir):
+    #Read from binary files to create a vector of traveltimes for the stations in stanames
+    #   at the index location ind, which is the 1D index
+    #   stanames is a list of station names only
+    from numpy import array
+    ttvec = array([])
+    for sta in stanames:
+        fid = open(ttdir+'bin.'+sta+'.traveltime')
+        ttvec = append(ttvec, read_binary_float(fid,ind) )
+        fid.close()
+    return ttvec
 
 class Fmm_vgrids():
 # vgrids.in is the FMM velocity file format. Looks like:
@@ -105,105 +117,145 @@ class Fmm_vgrids():
         fid.close()
 
 class Interface():
-#A 2D matrix containing interface information, e.g., topography or moho depth
+    """
+    A 2D matrix containing interface information, e.g., topography or
+    moho depth.
+    """
     def __init__(self):
         pass
-    def set_data(self,x,y,z):
-    #This builds the class ad-hoc. x,y,z are all numpy arrays. x,y are vectors, z is 2D
-        self.x,self.y,self.z = x,y,z
-        deg_to_rad = math.acos(-1)/180.0  #math.acos(-1) is pi
-        self.nx,self.ny = len(x),len(y) #total number of x and y coordinates
-        self.ox,self.oy = min(x),min(y)   #origins in lat,lon
-        self.dx = self.x[1]-self.x[0]     #Spacings in degrees
-        self.dy = self.y[1]-self.y[0]
-        self.ox_rad = self.ox*deg_to_rad  #Origins in radians
-        self.oy_rad = self.oy*deg_to_rad
-        self.dx_rad = self.dx*deg_to_rad  #Spacings in radians
-        self.dy_rad = self.dy*deg_to_rad
-    def read_topo_netcdf(self,fnam,subsamp=1):
-    #Read a netcdf formatted topography file
+
+    def set_data(self, x, y, z):
+        """
+        This builds the class ad-hoc. x,y,z are all numpy arrays. x,y
+        are vectors, z is 2D.
+        """
+        self.x, self.y, self.z = x, y, z
+        deg_to_rad = math.acos(-1) / 180.0  #math.acos(-1) is pi
+        self.nx, self.ny = len(x), len(y) #total number of x and y coordinates
+        self.ox, self.oy = min(x), min(y)   #origins in lat,lon
+        self.dx = self.x[1] - self.x[0]     #Spacings in degrees
+        self.dy = self.y[1] - self.y[0]
+        self.ox_rad = self.ox * deg_to_rad  #Origins in radians
+        self.oy_rad = self.oy * deg_to_rad
+        self.dx_rad = self.dx * deg_to_rad  #Spacings in radians
+        self.dy_rad = self.dy * deg_to_rad
+
+    def read_topo_netcdf(self, fnam, subsamp=1):
+        """
+        Read a netcdf formatted topography file
+        """
         from scipy.io import netcdf_file as netcdf
         topo = netcdf(fnam,'r')
         x = topo.variables['x'][::subsamp] #vector
         y = topo.variables['y'][::subsamp] #vector
-        z = topo.variables['z'][::subsamp,::subsamp] #matrix
+        z = topo.variables['z'][::subsamp, ::subsamp] #matrix
         self.subsamp = subsamp
-        self.set_data(x,y,z)
-    def interp(self,xi,yi):
-    #Find the values at points xi,yi by cubic spline
+        self.set_data(x, y, z)
+
+    def interp(self, xi, yi):
+        """
+        Find the values at points xi,yi by cubic spline
+        """
         import scipy.interpolate
-        gnn = scipy.interpolate.RectBivariateSpline(self.x,self.y,self.z.transpose())
+        gnn = scipy.interpolate.RectBivariateSpline(self.x,
+                                                    self.y,
+                                                    self.z.transpose())
         self.x_unint = self.x #Remember non-interpolated values
         self.y_unint = self.y
         self.z_unint = self.z
-        zi = gnn.__call__(xi,yi) #the actual interpolation
-        self.set_data(xi,yi,zi)
-    def write_fmm(self,fnam='out_interfaces',ifappend=False):
-    #Write to the fmm ascii format. ifappend should be set to True for any interface after the first; this will only write the z values and not the header
+        zi = gnn.__call__(xi, yi) #the actual interpolation
+        self.set_data(xi, yi, zi)
+
+    def write_fmm(self, fnam='out_interfaces', ifappend=False):
+        """
+        Write to the fmm ascii format. ifappend should be set to True
+        for any interface after the first; this will only write the z
+        values and not the header
+        """
         if not ifappend:
-            fid = open(fnam,'w')
+            fid = open(fnam, 'w')
             fid.write('2\n') # THIS ASSUMES THAT THERE ARE ONLY 2 INTERFACES
             fid.write('%u %u\n'%(self.ny,self.nx) )
             fid.write('%f %f\n'%(self.dy_rad,self.dx_rad) )
             fid.write('%f %f\n'%(self.oy_rad,self.ox_rad) )
         else:
-            fid = open(fnam,'a')
+            fid = open(fnam, 'a')
         for iy in range(self.ny):#Write the interface as a vector
-            outs = ''.join('{1:.{0}f}\n'.format(3,ii)  for ii in self.z[:,iy])
+            outs = ''.join('{1:.{0}f}\n'.format(3,ii)  for ii in self.z[:, iy])
             fid.write(outs)
         fid.close()
 
-def find_containing_cube(px,py,pz,xvec,yvec,zvec):
-#Find the 8 endpoints for the cell which contains point px,py
-#  We take advantage of the regular grid
-#  Assumes the point is inside the volume defined by xvec,yvec,zvec
-#  Returns an array of size 8,3 where the rows contain x,y,z coordinates of the cubes endpoints
-#  Also returns indexes of endpoints
+def find_containing_cube(px, py, pz, xvec, yvec, zvec):
+    """
+    Find the 8 endpoints for the cell which contains point px,py
+    We take advantage of the regular grid
+    Assumes the point is inside the volume defined by xvec,yvec,zvec
+    Returns an array of size 8,3 where the rows contain x,y,z coordinates of the cubes endpoints
+    Also returns indexes of endpoints
+    """
     #Find the nearest node point and indexes <--"indices" sounds stupid to me
-    xind,xnode = _find_nearest(px,xvec)
-    yind,ynode = _find_nearest(py,yvec)
-    zind,znode = _find_nearest(pz,zvec)
+    xind, xnode = _find_nearest(px, xvec)
+    yind, ynode = _find_nearest(py, yvec)
+    zind, znode = _find_nearest(pz, zvec)
     #Now check if the 3 coordinates of p are greater or less than the node it is nearest
-    if px>= xnode: #px is east of the nearest node
-        xi = xind+1
-        xn = xvec[xi]
-    else:        #px is west of the nearest node
-        xi = xind-1
-        xn = xvec[xi]
-    if py >= ynode: #px is north of the nearest node
-        yi = yind+1
-        yn = yvec[yi]
-    else:        #px is south of the nearest node
-        yi = yind-1
-        yn = yvec[yi]
-    if pz >= znode: #px is above the nearest node
-        zi = zind+1
-        zn = zvec[zi]
-    else:        #px is below the nearest node
-        zi = zind-1
-        zn = zvec[zi]
+    #px is east of the nearest node
+    if px >= xnode:
+        #if px is on the x boundary, return a duplicate point
+        xi, xn = (xind, xvec[xind]) if px == max(xvec)\
+                else (xind + 1, xvec[xind + 1])
+        #if px == max(xvec):
+        #    xn = xvec[xind]
+        #else:
+        #    xi = xind + 1
+        #    xn = xvec[xi]
+    #px is west of the nearest node
+    else:
+        #if px is on the x boundary, return a duplicate point
+        xi, xn = (xind, xvec[xind]) if px == min(xvec)\
+                else (xind - 1, xvec[xind - 1])
+        #if px == min(xvec):
+        #    xn = xvec[xind]
+        #else:
+        #    xi = xind - 1
+        #    xn = xvec[xi]
+    #py is north of the nearest node
+    if py >= ynode:
+        #if py is on the y boundary, return a duplicate point
+        yi, yn = (yind, yvec[yind]) if py == max(yvec)\
+                else (yind + 1, yvec[yind + 1])
+    #px is south of the nearest node
+    else:
+        yi, yn = (yind, yvec[yind]) if py == min(yvec)\
+                else (yind - 1, yvec[yind - 1])
+    #pz is above the nearest node
+    if pz >= znode:
+        zi, zn = (zind, zvec[zind]) if pz == max(zvec)\
+                else (zind + 1, zvec[zind + 1])
+    #pz is below the nearest node
+    else:
+        zi, zn = (zind, zvec[zind]) if pz == min(zvec)\
+                else (zind - 1, zvec[zind - 1])
     #Add new endpoints to define the cube
     endpoints = []
-    endpoints.append( [xnode,ynode,znode] )
-    endpoints.append( [xn,ynode,znode] )
-    endpoints.append( [xn,yn,znode]    )
-    endpoints.append( [xnode,yn,znode] )
-    endpoints.append( [xnode,ynode,zn] )
-    endpoints.append( [xn,ynode,zn] )
-    endpoints.append( [xn,yn,zn]    )
-    endpoints.append( [xnode,yn,zn] )
+    endpoints.append([xnode, ynode, znode])
+    endpoints.append([xn, ynode, znode])
+    endpoints.append([xn, yn, znode])
+    endpoints.append([xnode, yn, znode])
+    endpoints.append([xnode, ynode, zn])
+    endpoints.append([xn, ynode, zn])
+    endpoints.append([xn, yn, zn])
+    endpoints.append([xnode, yn, zn])
     #Add indices
     indexes = []
-    indexes.append( [xind,yind,zind] )
-    indexes.append( [xi,yind,zind] )
-    indexes.append( [xi,yi,zind]    )
-    indexes.append( [xind,yi,zind] )
-    indexes.append( [xind,yind,zi] )
-    indexes.append( [xi,yind,zi] )
-    indexes.append( [xi,yi,zi]    )
-    indexes.append( [xind,yi,zi] )
-
-    return endpoints,indexes
+    indexes.append([xind, yind, zind])
+    indexes.append([xi, yind, zind])
+    indexes.append([xi, yi, zind])
+    indexes.append([xind, yi, zind])
+    indexes.append([xind, yind, zi])
+    indexes.append([xi, yind, zi])
+    indexes.append([xi, yi, zi])
+    indexes.append([xind, yi, zi])
+    return endpoints, indexes
 
 def find_nearest(nparray,value):
     #Returns the nearest item in nparray to value
@@ -289,10 +341,11 @@ class Locator:
 
     def locate_eq(self, ev):
         #Locate an earthquake based on the arrivals in ev, traveltime files which are already saved
-        from temp_core_tools import Origin #This line will be deleted once things are reorganized.
         loc_params = self.location_parameters
         prop_params = self.propagation_grid
-        earth_rad = 6371.0
+        earth_rad = float(self.misc['earth_radius'])
+        #earth_rad = 6371.0
+
 
         #Get Propagation grid paramters
         nlat = int(prop_params['nlat'])
@@ -310,7 +363,6 @@ class Locator:
         qlon = arange(olon, dlon * nlon + olon, dlon)
         qlat = arange(olat, dlat * nlat + olat, dlat)
         qdep = arange(earth_rad - dz*nz,earth_rad,dz)+oz+dz
-
         #Grid search for best location
         start_time = time.time()
         absvec = []
@@ -406,7 +458,10 @@ class Locator:
                     calctt = array([]); #initialize the calculated tt vector
                     #ind = li.get_1D(qx[ix],qy[iy],qz[iz]) #Find the vector index
                     ind = li.get_1D(ix,iy,iz)
-                    calctt = self.read_tt_vector(arrsta,ind) #Make a traveltime vector from calculated times
+                    #Make a traveltime vector from calculated times
+                    calctt = read_tt_vector(arrsta,
+                                                 ind,
+                                                 self.misc['tt_map_dir'])
                     orivec = arrvec - calctt #Take the difference
                     origin_mean = append( origin_mean,orivec.mean()) #find the mean origin time
                     if min(calctt)<0: #If the traveltime <0, this gridpoint is null
@@ -450,19 +505,6 @@ class Locator:
         minx = qx[minx]; miny = qy[miny]; minz = qz[minz];
         return minx,miny,minz
 
-    def read_tt_vector(self, stanames, ind):
-        #Read from binary files to create a vector of traveltimes for the stations in stanames
-        #   at the index location ind, which is the 1D index
-        #   stanames is a list of station names only
-        from numpy import array
-        ttvec = array([])
-        ttdir=self.misc['tt_map_dir']
-        for sta in stanames:
-            fid = open(ttdir+'bin.'+sta+'.traveltime')
-            ttvec = append(ttvec, read_binary_float(fid,ind) )
-            fid.close()
-        return ttvec
-
     def get_subgrid_loc(self, ix, iy, iz, arrvec, arrsta, li):
         #Test least squares on real data
         import numpy as np
@@ -476,13 +518,13 @@ class Locator:
         if endz==li.nz: endz=iz 
         #Get traveltime vectors for the closest point and its neighbors
         ind = li.get_1D(ix,iy,iz)
-        tt000 = self.read_tt_vector(arrsta, ind)
+        tt000 = read_tt_vector(arrsta, ind, self.misc['tt_map_dir'])
         ind = li.get_1D(endx, iy, iz)
-        tt100 = self.read_tt_vector(arrsta, ind)
+        tt100 = read_tt_vector(arrsta, ind, self.misc['tt_map_dir'])
         ind = li.get_1D(ix, endy, iz)
-        tt010 = self.read_tt_vector(arrsta, ind)
+        tt010 = read_tt_vector(arrsta, ind, self.misc['tt_map_dir'])
         ind = li.get_1D(ix, iy, endz)
-        tt001 = self.read_tt_vector(arrsta, ind)
+        tt001 = read_tt_vector(arrsta, ind, self.misc['tt_map_dir'])
 
         #Calculate forward derivatives
         dt_dx = tt100 - tt000
@@ -527,7 +569,10 @@ class Locator:
                 for iz in range(len(qz)):
                     calctt = array([]) #initialize the calculated tt vector
                     ind  = li.get_1D(qx[ix], qy[iy], qz[iz]) #Find the vector index
-                    calctt = self.read_tt_vector(arrsta,ind) #Make a traveltime vector from calculated times
+                    #Make a traveltime vector from calculated times
+                    calctt = read_tt_vector(arrsta,
+                                            ind,
+                                            self.misc['tt_map_dir'])
                     orivec = arrvec - calctt #Take the difference
                     if min(calctt) < 0: #If the traveltime <0, this gridpoint is null
                         continue
@@ -554,28 +599,31 @@ def uniq(input):
   return output
 
 class Linear_index():
-    #Holds a 1D list of 3D indices and a 3D list of 1D indices
-    # where iz varies fastest, then iy, then ix
-    #  The speed of this can certainly be improved
-    def __init__(self,nx,ny,nz):
+    """
+    Holds a 1D list of 3D indices and a 3D list of 1D indices
+    where iz varies fastest, then iy, then ix
+    The speed of this can certainly be improved
+    """
+    def __init__(self, nx, ny, nz):
         from numpy import empty
         self.nx = nx; self.ny = ny; self.nz = nz;
         self.i1D = []
-        self.i3D = empty((nx,ny,nz)) #python has weird index conventions
+        self.i3D = empty((nx, ny, nz)) #python has weird index conventions
         ic = 0
         for ix in range(nx): #Fuck it, just be explicit
             for iy in range(ny):
                 for iz in range(nz):
-                    self.i1D.append( (ix,iy,iz) )
-                    self.i3D[ix,iy,iz] = ic
-                    ic = ic+1
+                    self.i1D.append((ix, iy, iz))
+                    self.i3D[ix, iy, iz] = ic
+                    ic = ic + 1
         self.i3D = self.i3D.astype(int)
-    def get_1D(self,ix,iy,iz):
-        return self.i3D[ix,iy,iz]
-    def get_3D(self,iv):
+
+    def get_1D(self, ix, iy, iz):
+        return self.i3D[ix, iy, iz]
+
+    def get_3D(self, iv):
         return self.i1D[iv]
 
-################################################
 class Station:
     """
     A containter class for station location data.
@@ -823,6 +871,64 @@ class Origin():
             ret += '%s' % self.arrivals[i]
         return ret
 
+    def update_predarr_times(self, cfg_dict):
+        """
+        Update the Phase.tt_calc and Phase.predarr fields for each
+        Phase object in Origin.arrivals field.
+        """
+        #Get Propagation grid paramters
+        ttdir = cfg_dict['misc']['tt_map_dir']
+        prop_params = cfg_dict['propagation_grid']
+        earth_rad = float(cfg_dict['misc']['earth_radius'])
+        nlat = int(prop_params['nlat'])
+        nlon = int(prop_params['nlon'])
+        nz = int(prop_params['nr'])
+        li  =  Linear_index(nlon, nlat, nz)
+        olon = float(prop_params['minlon'])
+        olat = float(prop_params['minlat'])
+        oz = float(prop_params['minz'])
+        dlon = float(prop_params['dlon'])
+        dlat = float(prop_params['dlat'])
+        dz = float(prop_params['dr'])
+        #Build vectors of geographic coordinates
+        qlon = arange(olon, dlon * nlon + olon, dlon)
+        qlat = arange(olat, dlat * nlat + olat, dlat)
+        qdep = arange(earth_rad - dz * nz, earth_rad, dz) + oz + dz
+        endpoints, indices = find_containing_cube(self.lat, self.lon, self.depth, qlat, qlon, qdep)
+        for arrival in self.arrivals:
+#            for index in indices:
+            ttvec = []
+            for i in range(len(indices)):
+                index, endpoint = indices[i], endpoints[i]
+                li1D = li.get_1D(index[0], index[1], index[2])
+                ttvec += [read_tt_vector([arrival.sta], li1D, ttdir)[0]]
+            print endpoints
+
+            dtt_dlat =  0 if endpoints[1][0] == endpoints[0][0] else\
+                    (ttvec[1] - ttvec[0]) / (endpoints[1][0] - endpoints[0][0])
+            print endpoints[1][0], endpoints[0][0]
+            print ttvec[1], ttvec[0]
+            print (ttvec[1] - ttvec[0]) / (endpoints[1][0] - endpoints[0][0])
+            dtt_dlon = 0 if endpoints[3][1] == endpoints[0][1] else\
+                    (ttvec[3] - ttvec[0]) / (endpoints[3][1] - endpoints[0][1])
+            dtt_drad = 0 if endpoints[4][2] == endpoints[0][2] else\
+                    (ttvec[4] - ttvec[0]) / (endpoints[4][2] - endpoints[0][2])
+            delta_lon = self.lon - endpoints[0][1]
+            delta_lat = self.lat - endpoints[0][0]
+            delta_rad = (earth_rad - self.depth) - endpoints[0][2]
+            #print 'dtt_dlon: %f' % dtt_dlon
+            print 'dtt_dlat: %f' % dtt_dlat
+            #print 'dtt_drad: %f' % dtt_drad
+            #print 'delta_lon: %f' % delta_lon
+            #print 'delta_lat: %f' % delta_lat
+            ##print 'delta_rad: %f' % delta_rad
+            #print 'tt0: %f' % ttvec[0]
+            #predarr = (dtt_dlon * delta_lon) + \
+                      #(dtt_dlat * delta_lat) + \
+                      #(dtt_drad * delta_rad)
+            #print 'delta_tt: %f' % predarr
+            break
+
 class Phase():
     """
     A container class for phase data.
@@ -834,7 +940,8 @@ class Phase():
         self.chan = chan
         self.qual = qual
         self.arid = arid
-        self.tt_calc = None #Calculated travel time
+        self.tt_calc = None #calculated travel time
+        self.predarr = None #predicted arrival time 
 
     def __str__(self):
         ret = 'Arrival Object\n--------------\n'
@@ -844,5 +951,5 @@ class Phase():
         ret += 'arid:\t\t%s\n' % self.arid
         ret += 'qual:\t\t%s\n'  % self.qual
         ret += 'tt_calc:\t\t%s\n' % self.tt_calc
+        ret += 'predarr:\t\t%s\n' % self.predarr
         return ret
-
