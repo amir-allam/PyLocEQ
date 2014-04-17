@@ -197,7 +197,9 @@ def write_origin(origin, output):
                        ('orid', origin.orid),
                        ('sta', arrival.sta),
                        ('phase', arrival.phase))
-        view = tbl_site.subset('sta =~ /%s/ && ondate < _%f_ && (offdate == -1 || offdate > _%f_)' % (arrival.sta, time(), time()))
+        view = tbl_site.subset('sta =~ /%s/ && ondate < _%f_ && '\
+                '(offdate == -1 || offdate > _%f_)'
+                % (arrival.sta, time(), time()))
         view.record = 0
         stalat, stalon = view.getv('lat', 'lon')
         tbl_predarr.record = tbl_predarr.addnull()
