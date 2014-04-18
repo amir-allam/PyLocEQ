@@ -21,7 +21,7 @@ def create_event_list(view):
     Behaviour:
     This method does NOT open or close the database passed in.
     """
-    from temp_core_tools import Event, Phase
+    from core_tools import Event, Phase
     import time as pytime
     import calendar
     event_list = []
@@ -146,9 +146,9 @@ def write_origin(origin, output):
     This method does NOT open or close the database passed in.
 
     Additional Comments:
-    This method will assumes that the database being written out is the
-    same as the input databse. Ie. NO arrival rows are created, they are
-    assumed to already exist.
+    This method assumes that the database being written out is the
+    same as the input database (ie. NO arrival rows are created, they are
+    assumed to already exist).
     """
     from time import time
     tbl_origin = output.schema_tables['origin']
@@ -180,7 +180,6 @@ def write_origin(origin, output):
                     ('mlid', origin.mlid),
                     ('algorithm', origin.algorithm),
                     ('commid', origin.commid))
-                    #'lddate', origin.lddate)
     tbl_event = output.schema_tables['event']
     tbl_event.record = tbl_event.find('evid == %d' % origin.evid)
     tbl_event.putv(('prefor', origin.orid))
@@ -188,27 +187,32 @@ def write_origin(origin, output):
     tbl_predarr = output.schema_tables['predarr']
     tbl_site = output.schema_tables['site']
     for arrival in origin.arrivals:
-#THIS IS A HACK!
-#predicted arrival time should be calculated for EVERY arrival
-        if arrival.tt_calc == None:
-            continue
-        tbl_assoc.record = tbl_assoc.addnull()
-        tbl_assoc.putv(('arid', arrival.arid),
-                       ('orid', origin.orid),
-                       ('sta', arrival.sta),
-                       ('phase', arrival.phase))
         view = tbl_site.subset('sta =~ /%s/ && ondate < _%f_ && '\
                 '(offdate == -1 || offdate > _%f_)'
                 % (arrival.sta, time(), time()))
         view.record = 0
         stalat, stalon = view.getv('lat', 'lon')
+        seaz = antpy.azimuth(stalat, stalon,
+                             origin.lat, origin.lon)
+        esaz = antpy.azimuth(origin.lat, origin.lon,
+                             stalat, stalon)
+        delta = antpy.distance(stalat, stalon, origin.lat, origin.lon)
+        tbl_assoc.record = tbl_assoc.addnull()
+        #print arrival.time, arrival.predarr
+        tbl_assoc.putv(('arid', arrival.arid),
+                       ('orid', origin.orid),
+                       ('sta', arrival.sta),
+                       ('phase', arrival.phase),
+                       ('delta', delta),
+                       ('seaz', seaz),
+                       ('esaz', esaz),
+                       ('timeres', (arrival.time - arrival.predarr)),
+                       ('vmodel', 'PyLocEQ'))
         tbl_predarr.record = tbl_predarr.addnull()
         tbl_predarr.putv(('arid', arrival.arid),
                          ('orid', origin.orid),
-                         ('time', origin.time + arrival.tt_calc),
-                         ('slow', antpy.distance(stalat, stalon,
-                                                 origin.lat, origin.lon)
-                                                 / arrival.tt_calc),
+                         ('time', arrival.predarr),
+                         ('slow', delta / (arrival.predarr - origin.time)),
                          ('seaz', antpy.azimuth(stalat,
                                                 stalon,
                                                 origin.lat,
