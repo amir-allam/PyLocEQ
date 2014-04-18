@@ -7,8 +7,10 @@ from array import array #This is for fast io when writing binary
 #Read ASCII arrival time file output by FMM code
 
 def num(s):
-#Convert a string to a number, choosing int or float automatically
-# SLOW, don't use for large lists
+    """
+    Convert a string to a number, choosing int or float automatically
+    SLOW, don't use for large lists
+     """
     try:
         return int(s)
     except ValueError:
@@ -33,7 +35,9 @@ def parse_cfg(config_file):
     return return_dict
 
 def load_faults():
-#Load the california fault map
+    """
+    Load the california fault map.
+    """
     fnam = 'cal_faults.dat'
     fid = open(fnam,'r')
     a = fid.readlines()
@@ -50,9 +54,11 @@ def load_faults():
     return faultlon, faultlat
 
 def read_tt_vector(stanames, ind, ttdir):
-    #Read from binary files to create a vector of traveltimes for the stations in stanames
-    #   at the index location ind, which is the 1D index
-    #   stanames is a list of station names only
+    """
+    Read from binary files to create a vector of traveltimes for the
+    stations in stanames at the index location ind, which is the 1D
+    index stanames is a list of station names only.
+    """
     from numpy import array
     ttvec = array([])
     for sta in stanames:
@@ -62,24 +68,30 @@ def read_tt_vector(stanames, ind, ttdir):
     return ttvec
 
 class Fmm_vgrids():
-# vgrids.in is the FMM velocity file format. Looks like:
-#    ngrids ntypes
-#    nradius nlat nlon     !number of points
-#    dradius dlat dlon     !grid spacings; uniform in each direction
-#    oradius olat olon     !origin of the grid
-#    V(1,1,1)
-#    V(2,1,1)
-#    V(1,2,1)
-#    V(1,1,2)
-#    etc...
-#
-#       NOTE: Right-handed; oradius is somewhere deep in the earth
-#
-# ngrids is the number of volumes. We generally use 1
-# ntypes will be 1 for just P, 2 for P and S
+    """
+    vgrids.in is the FMM velocity file format. Looks like:
+    ngrids ntypes
+    nradius nlat nlon     !number of points
+    dradius dlat dlon     !grid spacings; uniform in each direction
+    oradius olat olon     !origin of the grid
+    V(1,1,1)
+    V(2,1,1)
+    V(1,2,1)
+    V(1,1,2)
+    etc...
+
+    NOTE: Right-handed; oradius is somewhere deep in the earth
+
+    ngrids is the number of volumes. We generally use 1
+    ntypes will be 1 for just P, 2 for P and S
+    """
     def __init__(self):
         pass
-    def read(self,fnam='vgrids.in'): #Create a matrix of velocities
+
+    def read(self,fnam='vgrids.in'):
+        """
+        Create a matrix of velocities.
+        """
         self.fnam = fnam
         fid = open(fnam,'r')
         tmp = fid.readline().strip().split()
@@ -99,7 +111,10 @@ class Fmm_vgrids():
                     self.vel[ilon,ilat,irad] = float(tmp[0])
         #THERE SHOULD BE MORE STATEMENTS HERE IN CASE NTYPES,NGRIDS!= 1
         fid.close()
-    def write(self,outfnam='out.vgrids'): #Write to vgrids format
+    def write(self,outfnam='out.vgrids'):
+        """
+        Write to vgrids format.
+        """
         self.outfnam = outfnam
         fid = open(outfnam,'w')
         outs = str(self.ngrids)+' '+str(self.ntypes)+'\n'
@@ -190,49 +205,41 @@ def find_containing_cube(px, py, pz, xvec, yvec, zvec):
     Find the 8 endpoints for the cell which contains point px,py
     We take advantage of the regular grid
     Assumes the point is inside the volume defined by xvec,yvec,zvec
-    Returns an array of size 8,3 where the rows contain x,y,z coordinates of the cubes endpoints
+    Returns an array of size 8,3 where the rows contain x,y,z
+    coordinates of the cubes endpoints
     Also returns indexes of endpoints
     """
     #Find the nearest node point and indexes <--"indices" sounds stupid to me
     xind, xnode = _find_nearest(px, xvec)
     yind, ynode = _find_nearest(py, yvec)
     zind, znode = _find_nearest(pz, zvec)
-    #Now check if the 3 coordinates of p are greater or less than the node it is nearest
-    #px is east of the nearest node
+    #Now check if the 3 coordinates of p are greater or less than the
+    #node it is nearest.
     if px >= xnode:
+    #px is east of the nearest node
         #if px is on the x boundary, return a duplicate point
         xi, xn = (xind, xvec[xind]) if px == max(xvec)\
                 else (xind + 1, xvec[xind + 1])
-        #if px == max(xvec):
-        #    xn = xvec[xind]
-        #else:
-        #    xi = xind + 1
-        #    xn = xvec[xi]
-    #px is west of the nearest node
     else:
+    #px is west of the nearest node
         #if px is on the x boundary, return a duplicate point
         xi, xn = (xind, xvec[xind]) if px == min(xvec)\
                 else (xind - 1, xvec[xind - 1])
-        #if px == min(xvec):
-        #    xn = xvec[xind]
-        #else:
-        #    xi = xind - 1
-        #    xn = xvec[xi]
-    #py is north of the nearest node
     if py >= ynode:
+    #py is north of the nearest node
         #if py is on the y boundary, return a duplicate point
         yi, yn = (yind, yvec[yind]) if py == max(yvec)\
                 else (yind + 1, yvec[yind + 1])
-    #px is south of the nearest node
     else:
+    #px is south of the nearest node
         yi, yn = (yind, yvec[yind]) if py == min(yvec)\
                 else (yind - 1, yvec[yind - 1])
-    #pz is above the nearest node
     if pz >= znode:
+    #pz is above the nearest node
         zi, zn = (zind, zvec[zind]) if pz == max(zvec)\
                 else (zind + 1, zvec[zind + 1])
-    #pz is below the nearest node
     else:
+    #pz is below the nearest node
         zi, zn = (zind, zvec[zind]) if pz == min(zvec)\
                 else (zind - 1, zvec[zind - 1])
     #Add new endpoints to define the cube
@@ -258,7 +265,9 @@ def find_containing_cube(px, py, pz, xvec, yvec, zvec):
     return endpoints, indexes
 
 def find_nearest(nparray,value):
-    #Returns the nearest item in nparray to value
+    """
+    Returns the nearest item in nparray to value
+    """
     idx = (abs(nparray-value)).argmin()
     return nparray.flat[idx]
 
@@ -267,8 +276,10 @@ def find_nearest_index(nparray,value):
     return idx
 
 def _find_nearest(px,xvec):
-#Find the nearest x in xvec 
-#  returns index
+    """
+    Find the nearest x in xvec
+    returns index
+    """
     best_ind = 0
     shortest = 100000000.0;
     for ii in range(len(xvec)):
@@ -277,10 +288,34 @@ def _find_nearest(px,xvec):
             best_ind = ii
     return best_ind,xvec[best_ind]
 
-def read_binary_float(fid,n=0,precision='double'):
+def _find_nearest_grid_node(r, nodes):
+    """
+    Find and return the grid node nearest to r.
+
+    Arguments:
+    r - position vector
+    nodes - array of grid node position vectors
+
+    Returns:
+    closest - position vector of closest grid node
+    """
+    from math import sqrt
+    closest_node, smallest_dist = None, None
+    for node in nodes:
+        dist = sqrt((node[0] - r[0])**2 + \
+                    (node[1] - r[1])**2 + \
+                    (node[2] - r[2])**2)
+        if smallest_dist == None or dist < smallest_dist:
+            smallest_dist, closest_node = dist, node
+    return closest_node
+
+def read_binary_float(fid, n=0, precision='double'):
+    """
+    Read the nth float value from a binary file at the with the given
+    precision following python conventions, 0 is the index of the first
+    value.
+    """
     import struct
-#read the nth float value from a binary file at the with the given precision
-# following python conventions, 0 is the index of the first value
     if precision is 'single':
         numbytes = 4;packstr = 'f'
     else:
@@ -294,23 +329,34 @@ def read_binary_float(fid,n=0,precision='double'):
 
 
 
-def _grid_search_traveltimes_origin(arrsta,qx,qy,qz,arrvec,li):
-#Find the minimum value of the origin time standard deviation following Ben-Zion et al., 1992 (JGR)
-#  sta          list of station names; strings
-#   qx,qy,qz    vectors of indices to search through
-#   arrvec      vector of absolute arrivals in the same order as sta
-#   li          Linear_index class for the entire traveltime grid
-    from numpy import array #There is no reason this should be here, but the next line generated error messages if it wasn't. I'm confused
+def _grid_search_traveltimes_origin(arrsta, qx, qy, qz, arrvec, li):
+    """
+    Find the minimum value of the origin time standard deviation
+    following Ben-Zion et al., 1992 (JGR)
+
+    Arguments:
+    arrsta - list of station names; strings
+    qx, qy, qz - vectors of indices to search through
+    arrvec - vector of absolute arrivals in the same order as sta
+    li - LinearIndex class for the entire traveltime grid
+    """
+    #There is no reason this should be here, but the next line
+    #generated error messages if it wasn't. I'm confused.
+    from numpy import array
     rms = array([])
     #origin_std = array([])
-    origin_std = empty([ len(qy),len(qx),len(qz)] )+1000 #Give large starting values
+    #Give large starting values
+    origin_std = empty([ len(qy),len(qx),len(qz)] )+1000
     origin_mean = empty([ len(qy),len(qx),len(qz)] )
-    search_inds = Linear_index(len(qx),len(qy),len(qz))
-    for ix in range(len(qx)):  #Loop over the three vectors, searching every point
+    search_inds = LinearIndex(len(qx),len(qy),len(qz))
+    #Loop over the three vectors, searching every point
+    for ix in range(len(qx)):
         for iy in range(len(qy)):
             for iz in range(len(qz)):
-                calctt = array([]); #initialize the calculated tt vector
-                ind = li.get_1D(qx[ix],qy[iy],qz[iz]) #Find the vector index
+                #initialize the calculated tt vector
+                calctt = array([])
+                #Find the vector index
+                ind = li.get_1D(qx[ix],qy[iy],qz[iz])
                 for sta in arrsta: #Build vector of calculated ttimes
                     fid = open('bin.'+sta+'.traveltime')
                     tmp = read_binary_float(fid,ind)
@@ -340,7 +386,10 @@ class Locator:
             setattr(self, key, cfg_dict[key])
 
     def locate_eq(self, ev):
-        #Locate an earthquake based on the arrivals in ev, traveltime files which are already saved
+        """
+        Locate an earthquake based on the arrivals in ev, traveltime
+        files which are already saved.
+        """
         loc_params = self.location_parameters
         prop_params = self.propagation_grid
         earth_rad = float(self.misc['earth_radius'])
@@ -351,7 +400,7 @@ class Locator:
         nlat = int(prop_params['nlat'])
         nlon = int(prop_params['nlon'])
         nz = int(prop_params['nr'])
-        li  =  Linear_index(nlon, nlat, nz)
+        li  =  LinearIndex(nlon, nlat, nz)
         olon = float(prop_params['minlon'])
         olat = float(prop_params['minlat'])
         oz = float(prop_params['minz'])
@@ -377,7 +426,8 @@ class Locator:
                 arrpha.append(arrival.phase)
             if not os.path.isfile(arrival.sta + 'traveltime'):
                 continue
-        if len(arrvec)<6: #About this many phases are needed to get a decent result
+        if len(arrvec)<6:
+        #About this many phases are needed to get a decent result
             return None
         absvec = asarray(absvec)
         arrvec = asarray(arrvec)
@@ -389,8 +439,18 @@ class Locator:
         dx, dy, dz = nlon / dstep, nlat / dstep, nz / dstep
         #dx, dy, dz = 1,1,1 #Remove this later
         qx, qy, qz = range(1, nlon, dx), range(1, nlat, dy), range(1, nz, dz);
-        #minx, miny, minz, orgmin = self.grid_search_traveltimes_origin(arrsta, qx, qy,qz, absvec, li)
-        minx, miny, minz, origin_mean, origin_std= self.exp_grid_search(arrsta,qx,qy,qz, absvec, li)
+        #minx, miny, minz, orgmin = self.grid_search_traveltimes_origin(arrsta,
+        #                                                                qx,
+        #                                                                qy,
+        #                                                                qz,
+        #                                                                absvec,
+        #                                                                li)
+        minx, miny, minz, origin_mean, origin_std= self.exp_grid_search(arrsta,
+                                                                        qx,
+                                                                        qy,
+                                                                        qz,
+                                                                        absvec,
+                                                                        li)
         #Finer search
     #    minx, miny, minz = grid_search_traveltimes_rms(arrsta, qx, qy, qz,
     #                                                            arrvec,li)
@@ -401,17 +461,38 @@ class Locator:
         qx = self.fix_boundary_search(qx, li.nx)
         qy = self.fix_boundary_search(qy, li.ny)
         qz = self.fix_boundary_search(qz, li.nz)
-        #minx, miny, minz, orgmin = self.grid_search_traveltimes_origin(arrsta, qx, qy,qz, absvec, li)
-        minx, miny, minz, origin_mean, origin_std= self.exp_grid_search(arrsta,qx,qy,qz, absvec, li)
-    #    minx, miny, minz = grid_search_traveltimes_rms(arrsta, qx, qy, qz,arrvec,li)
+        #minx, miny, minz, orgmin = self.grid_search_traveltimes_origin(arrsta,
+        #                                                                qx,
+        #                                                                qy,
+        #                                                                qz,
+        #                                                                absvec,
+        #                                                                li)
+        minx, miny, minz, origin_mean, origin_std= self.exp_grid_search(arrsta,
+                                                                        qx,
+                                                                        qy,
+                                                                        qz,
+                                                                        absvec,
+                                                                        li)
+        #minx, miny, minz = grid_search_traveltimes_rms(arrsta,
+        #                                               qx,
+        #                                               qy,
+        #                                               qz,
+        #                                               arrvec,
+        #                                               li)
         #orgmin = 0
 
         #Find the best subgrid location
-        c,resid,tt_updated = self.get_subgrid_loc(minx,miny,minz,arrvec,arrsta,li)
+        c, resid, tt_updated = self.get_subgrid_loc(minx,
+                                                    miny,
+                                                    minz,
+                                                    arrvec,
+                                                    arrsta,
+                                                    li)
         delta_x = qlon[1] - qlon[0]
         delta_y = qlat[1] - qlat[0]
         delta_z = qdep[1] - qdep[0]
-        loc_change = c*[delta_x,delta_y,delta_z] #Subgrid location change in lon/lat/depth
+        #Subgrid location change in lon/lat/depth
+        loc_change = c * [delta_x, delta_y, delta_z]
 
         #Add calculated travel times to Origin
 #        ic=0 #Just a counter
@@ -444,13 +525,13 @@ class Locator:
     #  sta          list of station names; strings
     #   qx,qy,qz    vectors of indices to search through
     #   arrvec      vector of absolute arrivals in the same order as sta
-    #   li          Linear_index class for the entire traveltime grid
+    #   li          LinearIndex class for the entire traveltime grid
         from numpy import array #There is no reason this should be here, but the next line generated error messages if it wasn't. I'm confused
         origin_std = array([])
         origin_mean = array([])
         #origin_std = empty([ len(qy),len(qx),len(qz)] )+1000 #Give large starting values
         #origin_mean = empty([ len(qy),len(qx),len(qz)] )
-        search_inds = Linear_index(len(qx),len(qy),len(qz))
+        search_inds = LinearIndex(len(qx),len(qy),len(qz))
         for ix in qx: #range(len(qx)):  #Loop over the three vectors, searching every point
             #print 'On ix: ', ix,'/',len(qx),'\n'
             for iy in qy: #range(len(qy)):
@@ -483,10 +564,10 @@ class Locator:
     #   sta         list of station names; strings
     #   qx,qy,qz    vectors of indices to search through
     #   arrvec      vector of arrivals in the same order as sta
-    #   li          Linear_index class for the entire traveltime grid
+    #   li          LinearIndex class for the entire traveltime grid
         from numpy import array #There is no reason this should be here, but the next line generated error messages if it wasn't. I'm confused
         rms = array([])
-        search_inds = Linear_index(len(qx),len(qy),len(qz))
+        search_inds = LinearIndex(len(qx),len(qy),len(qz))
         for ix in qx:  #Loop over the three vectors, searching every point
             for iy in qy:
                 for iz in qz:
@@ -556,13 +637,13 @@ class Locator:
     #  sta          list of station names; strings
     #   qx,qy,qz    vectors of indices to search through
     #   arrvec      vector of absolute arrivals in the same order as sta
-    #   li          Linear_index class for the entire traveltime grid
+    #   li          LinearIndex class for the entire traveltime grid
         from numpy import array, indices #There is no reason this should be here, but the next line generated error messages if it wasn't. I'm confused
         #origin_std = array([])
         #origin_mean = array([])
         origin_std = empty([len(qy), len(qx), len(qz)]) + 1000 #Give large starting values
         origin_mean = empty([len(qy), len(qx), len(qz)])
-        search_inds = Linear_index(len(qx), len(qy), len(qz))
+        search_inds = LinearIndex(len(qx), len(qy), len(qz))
         for ix in range(len(qx)):  #Loop over the three vectors, searching every point
             print 'On ix: ', ix,'/',len(qx),'\n'
             for iy in range(len(qy)):
@@ -598,7 +679,7 @@ def uniq(input):
       output.append(x)
   return output
 
-class Linear_index():
+class LinearIndex():
     """
     Holds a 1D list of 3D indices and a 3D list of 1D indices
     where iz varies fastest, then iy, then ix
@@ -883,7 +964,7 @@ class Origin():
         nlat = int(prop_params['nlat'])
         nlon = int(prop_params['nlon'])
         nz = int(prop_params['nr'])
-        li  =  Linear_index(nlon, nlat, nz)
+        li  =  LinearIndex(nlon, nlat, nz)
         olon = float(prop_params['minlon'])
         olat = float(prop_params['minlat'])
         oz = float(prop_params['minz'])
@@ -902,13 +983,11 @@ class Origin():
                 index, endpoint = indices[i], endpoints[i]
                 li1D = li.get_1D(index[0], index[1], index[2])
                 ttvec += [read_tt_vector([arrival.sta], li1D, ttdir)[0]]
-            print endpoints
-
             dtt_dlat =  0 if endpoints[1][0] == endpoints[0][0] else\
                     (ttvec[1] - ttvec[0]) / (endpoints[1][0] - endpoints[0][0])
-            print endpoints[1][0], endpoints[0][0]
-            print ttvec[1], ttvec[0]
-            print (ttvec[1] - ttvec[0]) / (endpoints[1][0] - endpoints[0][0])
+            #print endpoints[1][0], endpoints[0][0]
+            #print ttvec[1], ttvec[0]
+            #print (ttvec[1] - ttvec[0]) / (endpoints[1][0] - endpoints[0][0])
             dtt_dlon = 0 if endpoints[3][1] == endpoints[0][1] else\
                     (ttvec[3] - ttvec[0]) / (endpoints[3][1] - endpoints[0][1])
             dtt_drad = 0 if endpoints[4][2] == endpoints[0][2] else\
@@ -916,18 +995,12 @@ class Origin():
             delta_lon = self.lon - endpoints[0][1]
             delta_lat = self.lat - endpoints[0][0]
             delta_rad = (earth_rad - self.depth) - endpoints[0][2]
-            #print 'dtt_dlon: %f' % dtt_dlon
-            print 'dtt_dlat: %f' % dtt_dlat
-            #print 'dtt_drad: %f' % dtt_drad
-            #print 'delta_lon: %f' % delta_lon
-            #print 'delta_lat: %f' % delta_lat
-            ##print 'delta_rad: %f' % delta_rad
-            #print 'tt0: %f' % ttvec[0]
-            #predarr = (dtt_dlon * delta_lon) + \
-                      #(dtt_dlat * delta_lat) + \
-                      #(dtt_drad * delta_rad)
-            #print 'delta_tt: %f' % predarr
-            break
+            tt = ttvec[0] + (dtt_dlon * delta_lon)\
+                          + (dtt_dlat * delta_lat)\
+                          + (dtt_drad * delta_rad)
+            predarr = self.time + tt
+            arrival.tt_calc = tt
+            arrival.predarr = predarr
 
 class Phase():
     """
