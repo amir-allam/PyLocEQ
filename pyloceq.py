@@ -24,6 +24,7 @@ def _main():
                 origin = locator.locate_eq(origin)
                 if origin == None:
                     continue
+                origin.update_predarr_times(cfg_dict)
                 ant_tools.write_origin(origin, db)
     return 0
 
