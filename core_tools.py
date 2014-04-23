@@ -1006,12 +1006,13 @@ class Phase():
     """
     A container class for phase data.
     """
-    def __init__(self, sta, time, phase, chan=None, deltim=None, arid=None):
+    def __init__(self, sta, time, phase, chan=None, deltim=None, qual=None, arid=None):
         self.sta = sta
         self.time = time
         self.phase = phase
         self.chan = chan
         self.deltim = deltim
+        self.qual = qual
         self.arid = arid
         self.tt_calc = None #calculated travel time
         self.predarr = None #predicted arrival time 
