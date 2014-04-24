@@ -2,7 +2,7 @@ import os
 import time
 from numpy import * #Should probably be more specific
 #from matplotlib import pyplot as plt
-from array import array #This is for fast io when writing binary
+#from array import array #This is for fast io when writing binary #AAA MAY NEED TO DELETE
 
 #Read ASCII arrival time file output by FMM code
 
@@ -409,9 +409,13 @@ class Locator:
         dz = float(prop_params['dr'])
 
         #Build vectors of geographic coordinates
-        qlon = arange(olon, dlon * nlon + olon, dlon)
-        qlat = arange(olat, dlat * nlat + olat, dlat)
-        qdep = arange(earth_rad - dz*nz,earth_rad,dz)+oz+dz
+        qlon = linspace(olon,dlon * nlon + olon,nlon,False)
+        qlat = linspace(olat,dlat * nlat + olat,nlat,False)
+        qdep = earth_rad - linspace(earth_rad+oz-(nz-1)*dz,earth_rad+oz,nz)
+        delta_x = qlon[1] - qlon[0]
+        delta_y = qlat[1] - qlat[0]
+        delta_z = qdep[1] - qdep[0]
+
         #Grid search for best location
         start_time = time.time()
         absvec = []
@@ -420,79 +424,55 @@ class Locator:
         arrpha = []        #List of phases
         for arrival in ev.arrivals:
             if arrival.phase is 'P':
-                arrvec.append(arrival.time - ev.time)
                 absvec.append(arrival.time)
                 arrsta.append(arrival.sta)
                 arrpha.append(arrival.phase)
             if not os.path.isfile(arrival.sta + 'traveltime'):
                 continue
-        if len(arrvec)<6:
-        #About this many phases are needed to get a decent result
+        if len(arrvec)<1:#Can't locate without at least one
             return None
-        absvec = asarray(absvec)
-        arrvec = asarray(arrvec)
-        #print 'Number of phases used: ',len(arrvec)
+        absvec=asarray(absvec)
 
         #Search coarsely
         #dstep should go in parameter file.
         dstep = int(loc_params['dstep2'])
         dx, dy, dz = nlon / dstep, nlat / dstep, nz / dstep
-        #dx, dy, dz = 1,1,1 #Remove this later
         qx, qy, qz = range(1, nlon, dx), range(1, nlat, dy), range(1, nz, dz);
-        #minx, miny, minz, orgmin = self.grid_search_traveltimes_origin(arrsta,
-        #                                                                qx,
-        #                                                                qy,
-        #                                                                qz,
-        #                                                                absvec,
-        #                                                                li)
-        minx, miny, minz, origin_mean, origin_std= self.exp_grid_search(arrsta,
-                                                                        qx,
-                                                                        qy,
-                                                                        qz,
-                                                                        absvec,
-                                                                        li)
-        #Finer search
-    #    minx, miny, minz = grid_search_traveltimes_rms(arrsta, qx, qy, qz,
-    #                                                            arrvec,li)
-        buff = int(loc_params['buff2'])
-        qx = range(minx - buff, minx + buff)
-        qy = range(miny - buff, miny + buff)
-        qz = range(minz - buff, minz + buff);
-        qx = self.fix_boundary_search(qx, li.nx)
-        qy = self.fix_boundary_search(qy, li.ny)
-        qz = self.fix_boundary_search(qz, li.nz)
-        #minx, miny, minz, orgmin = self.grid_search_traveltimes_origin(arrsta,
-        #                                                                qx,
-        #                                                                qy,
-        #                                                                qz,
-        #                                                                absvec,
-        #                                                                li)
-        minx, miny, minz, origin_mean, origin_std= self.exp_grid_search(arrsta,
-                                                                        qx,
-                                                                        qy,
-                                                                        qz,
-                                                                        absvec,
-                                                                        li)
-        #minx, miny, minz = grid_search_traveltimes_rms(arrsta,
-        #                                               qx,
-        #                                               qy,
-        #                                               qz,
-        #                                               arrvec,
-        #                                               li)
-        #orgmin = 0
+        minx, miny, minz, orgmin,ha = self.grid_search_abs(arrsta, qx, qy,qz, absvec, li)
 
-        #Find the best subgrid location
-        c, resid, tt_updated = self.get_subgrid_loc(minx,
-                                                    miny,
-                                                    minz,
-                                                    arrvec,
-                                                    arrsta,
-                                                    li)
-        delta_x = qlon[1] - qlon[0]
-        delta_y = qlat[1] - qlat[0]
-        delta_z = qdep[1] - qdep[0]
-        #Subgrid location change in lon/lat/depth
-        loc_change = c * [delta_x, delta_y, delta_z]
+        #Finer search
+        buffx=qx[1]-qx[0]
+        buffy=qy[1]-qy[0]
+        buffz=buffx/3 #Depth is much trickier to nail down, so this will be done later more strictly
+        qx = range(minx - buffx, minx + buffx)
+        qy = range(miny - buffy, miny + buffy)
+        qz = range(minz - buffz, minz + buffz);
+        qx = fix_boundary_search(qx, li.nx)
+        qy = fix_boundary_search(qy, li.ny)
+        qz = fix_boundary_search(qz, li.nz)
+        minx, miny, minz, otime,ha = self.grid_search_abs(arrsta, qx, qy,qz, absvec, li)
+
+        #Get depth
+        qx,qy=[minx],[miny]
+        qz=range(nz)
+        minx, miny, minz, otime,ha = self.grid_search_abs(arrsta, qx, qy,qz, absvec, li)
+
+        #Best-fit grid point
+        glon, glat, gz = qlon[minx], qlat[miny], qdep[minz]
+
+        #Get subgrid location
+        for i in range(10):#This is really a while loop, but like this in case it is degenerate
+            loc=core_tools.Locator(cfg_dict)
+            c,resid,tt_updated,sigma,resid_std=loc.get_subgrid_loc(minx,miny,minz,absvec,arrsta,li)
+            loc_change=c*[delta_x, delta_y, delta_z]
+            #Find the best-fit source location in geographic coordinates
+            newloc=[newlon,newlat,newz]=asarray([glon,glat,gz])+loc_change
+            ix=nonzero(qlon==find_nearest(qlon,newlon))[0][0]
+            iy=nonzero(qlat==find_nearest(qlat,newlat))[0][0]
+            iz=nonzero(qdep==find_nearest(qdep,newz))[0][0]
+            if minx==ix and miny==iy and minz==iz:
+                break
+            minx,miny,minz=ix,iy,iz
 
         #Add calculated travel times to Origin
 #        ic=0 #Just a counter
@@ -506,19 +486,14 @@ class Locator:
                     arrival.tt_calc = tt_updated[ic]
                     break
 
-        #Find the best-fit source location in geographic coordinates
-        newloc = [newlon,newlat,newz] = [ qlon[minx],qlat[miny],qdep[minz] ] #+loc_change
-        best_otime=origin_mean.flatten()[origin_std.argmin()]
         elapsed_time = time.time() - start_time
-        print ev.orid,len(arrvec),newlon,newlat,earth_rad - newz,ev.lon,ev.lat,ev.depth,ev.time -best_otime,elapsed_time,resid
-        return Origin(newlat,
+        return Origin(newlat,           #Add sigma and residual standard deviation (rsid_std) AAA
                       newlon,
-                      earth_rad - newz,
-                      best_otime,
+                      newz,
+                      otime,
                       'PyLocEQ',
                       arrivals=ev.arrivals,
                       evid=ev.evid)
-        #This function will return location, origin time, and error estimates for both
 
     def grid_search_traveltimes_origin(self, arrsta, qx, qy, qz, arrvec, li):
     #Find the minimum value of the origin time standard deviation following Ben-Zion et al., 1992 (JGR)
@@ -586,17 +561,50 @@ class Locator:
         minx = qx[minx]; miny = qy[miny]; minz = qz[minz];
         return minx,miny,minz
 
+    def grid_search_abs(arrsta,qx,qy,qz,arrvec,li):
+    #Find the minimum of the absolute value of the
+    #        calculated origin time following Ben-Zion et al., 1992 (JGR)
+    #   sta          list of station names; strings
+    #   qx,qy,qz    vectors of indices to search through
+    #   arrvec      vector of absolute arrivals in the same order as sta
+    #   li          Linear_index class for the entire traveltime grid
+        from numpy import array,indices #AAA MAY NEED TO DELETE
+        best_misfit=100000.0
+        search_inds=Linear_index(len(qx),len(qy),len(qz))
+        for ix in range(len(qx)):  #Loop over the three vectors, searching every point
+            for iy in range(len(qy)):
+                for iz in range(len(qz)):
+                    calctt=array([]); #initialize the calculated tt vector
+                    ind=li.get_1D(qx[ix],qy[iy],qz[iz]) #Find the vector index
+                    calctt=read_tt_vector(arrsta,ind) #Make traveltime vector from calculated times
+                    if min(calctt)<0: #If the traveltime <0, this gridpoint is null
+                        continue
+                    #Compute misfit measurements
+                    #mini=calctt.argmin() #We will compute the origin time from the smallest traveltime Following Pavlis et al., 2004
+                    orivec=arrvec-calctt #Take the difference
+                    #otime=orivec[mini] #Origin time 
+                    otime=orivec.mean()
+                    res=orivec-otime
+                    #weight=1/abs(res)/(1/abs(res)).sum()  #We can weight by e.g., residual here
+                    #misfit=(abs(res)*weight).sum() #Weighted absolute value
+                    misfit=(abs(res)).sum() #Absolute value
+                    if misfit<best_misfit:
+                        best_misfit=misfit
+                        minx,miny,minz=qx[ix],qy[iy],qz[iz]
+                        best_ot=otime
+        return minx,miny,minz,best_ot,best_misfit
+        #return minx,miny,minz,origin_mean,misfit
+
     def get_subgrid_loc(self, ix, iy, iz, arrvec, arrsta, li):
         #Test least squares on real data
         import numpy as np
         from scipy import linalg
-        import matplotlib.pyplot as plt
 
         #Cut off derivative calculations at model boundaries
         endx=ix+1; endy=iy+1; endz=iz+1
-        if endx==li.nx: endx=ix 
-        if endy==li.ny: endy=iy 
-        if endz==li.nz: endz=iz 
+        if endx==li.nx: endx=ix
+        if endy==li.ny: endy=iy
+        if endz==li.nz: endz=iz
         #Get traveltime vectors for the closest point and its neighbors
         ind = li.get_1D(ix,iy,iz)
         tt000 = read_tt_vector(arrsta, ind, self.misc['tt_map_dir'])
@@ -606,19 +614,44 @@ class Locator:
         tt010 = read_tt_vector(arrsta, ind, self.misc['tt_map_dir'])
         ind = li.get_1D(ix, iy, endz)
         tt001 = read_tt_vector(arrsta, ind, self.misc['tt_map_dir'])
+        #backwards WILL ALSO NEED EDGEPROOFING !!!!!
+        ind=li.get_1D(ix-1,iy,iz)
+        btt100= read_tt_vector(arrsta,ind, self.misc['tt_map_dir'])
+        ind=li.get_1D(ix,iy-1,iz)
+        btt010= read_tt_vector(arrsta,ind, self.misc['tt_map_dir'])
+        ind=li.get_1D(ix,iy,iz-1)
+        btt001= read_tt_vector(arrsta,ind, self.misc['tt_map_dir'])
 
         #Calculate forward derivatives
-        dt_dx = tt100 - tt000
-        dt_dy = tt010 - tt000
-        dt_dz = tt001 - tt000
-        #Build A matrix and r in r=Ax  (x is the spatial vector here [x,y,z]
-        A = c_[dt_dx, dt_dy, dt_dz]
-        r = arrvec - tt000
-        c, resid, rank, sigma = linalg.lstsq(A, r)
+        dt_dx=tt100-tt000
+        dt_dy=tt010-tt000
+        dt_dz=tt001-tt000
+        #backwards
+        bdt_dx=tt000-btt100
+        bdt_dy=tt000-btt010
+        bdt_dz=tt000-btt001
+        #Central
+        dt_dx=(dt_dx+bdt_dx)/2 #average
+        dt_dy=(dt_dy+bdt_dy)/2 #average
+        dt_dz=(dt_dz+bdt_dz)/2 #average
+
+        #Build and condition residual
+        r=arrvec-tt000
+        r=r-r.mean()
+        #Create weight based on the sensitivity to depth changes (since it is hardest to constrain)
+        w=dt_dz/dt_dz.sum() #Normalize by sum. May be unnecessary
+        #Build A matrix, w, and r in wr=Ax  (x is the spatial vector here [x,y,z])
+        A=c_[dt_dx,dt_dy,dt_dz]
+        wr=r #W*r   Currently not using the weight; doesn't seem necessary here
+        c,resid,rank,sigma=linalg.lstsq(A,wr)
 
         #Compute updated travel times
         tt_updated=tt000+(A*c).sum(axis=1) #c has independent changes for x,y,z, so sum them
-        return c, resid,tt_updated
+        #Compute variance-covariance matrix
+        A=c_[dt_dx,dt_dy,dt_dz,dt_dx*0+1] #Add origin time 'derivative'
+        sigma = np.dot(A.transpose(),A) #There is probably more to it than this...
+
+        return c, resid,tt_updated,sigma,r.std()
 
     def fix_boundary_search(self, qx, nx):
     #When performing a grid search on a subgrid, make sure you don't go off the edges
@@ -631,45 +664,6 @@ class Locator:
                 qx[ix] = nx - 1
         newqx = uniq(qx)
         return newqx
-
-    def exp_grid_search(self, arrsta, qx, qy, qz, arrvec, li):
-    #Find the minimum value of the origin time standard deviation following Ben-Zion et al., 1992 (JGR)
-    #  sta          list of station names; strings
-    #   qx,qy,qz    vectors of indices to search through
-    #   arrvec      vector of absolute arrivals in the same order as sta
-    #   li          LinearIndex class for the entire traveltime grid
-        from numpy import array, indices #There is no reason this should be here, but the next line generated error messages if it wasn't. I'm confused
-        #origin_std = array([])
-        #origin_mean = array([])
-        origin_std = empty([len(qy), len(qx), len(qz)]) + 1000 #Give large starting values
-        origin_mean = empty([len(qy), len(qx), len(qz)])
-        search_inds = LinearIndex(len(qx), len(qy), len(qz))
-        for ix in range(len(qx)):  #Loop over the three vectors, searching every point
-            print 'On ix: ', ix,'/',len(qx),'\n'
-            for iy in range(len(qy)):
-                for iz in range(len(qz)):
-                    calctt = array([]) #initialize the calculated tt vector
-                    ind  = li.get_1D(qx[ix], qy[iy], qz[iz]) #Find the vector index
-                    #Make a traveltime vector from calculated times
-                    calctt = read_tt_vector(arrsta,
-                                            ind,
-                                            self.misc['tt_map_dir'])
-                    orivec = arrvec - calctt #Take the difference
-                    if min(calctt) < 0: #If the traveltime <0, this gridpoint is null
-                        continue
-                    origin_std[iy, ix, iz] = orivec.std()
-                    origin_mean[iy, ix, iz] = orivec.mean()
-        #Now find the 3D index of the best point so far
-        #new_origin = origin_mean.flatten()[oristd.argmin()] #The origin time with lowest std
-        besti = origin_std.argmin() #1D index of best point
-        helper_i = indices(origin_std.shape) #3D indices
-        miny = helper_i[0, :, :, :].flatten()[besti]
-        minx = helper_i[1, :, :, :].flatten()[besti]
-        minz = helper_i[2, :, :, :].flatten()[besti]
-        minx = qx[minx]
-        miny = qy[miny]
-        minz = qz[minz];
-        return minx, miny, minz, origin_mean, origin_std
 
 def uniq(input):
 #Remove duplicate items from a list. Preserves order.
