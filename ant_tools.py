@@ -73,10 +73,10 @@ def create_event_list(view):
             view3 = view3.join('arrival')
             arrival_data = [record3.getv('sta',
                                          'arrival.time',
-                                         'iphase', 'arid')\
+                                         'iphase', 'arid', 'deltim')\
                                          for record3 in view3.iter_record()]
-            arrivals = [Phase(name, time, phase, arid=arid)
-                        for name, time, phase, arid in arrival_data]
+            arrivals = [Phase(name, time, phase, arid=arid, deltim=deltim)
+                        for name, time, phase, arid, deltim in arrival_data]
             event.add_origin(lat,
                              lon,
                              depth,
